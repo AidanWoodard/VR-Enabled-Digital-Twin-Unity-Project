@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a6a76657226a24045ba224dcbcd86822
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Thick Wide Rollers 2r.prefab
+  uploadId: 544042

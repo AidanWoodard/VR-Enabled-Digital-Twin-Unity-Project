@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0cd2e4b00a3194d4b91b7bb9f2b7c7b5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Materials/Conveyors/Conveyor 2.mat
+  uploadId: 544042

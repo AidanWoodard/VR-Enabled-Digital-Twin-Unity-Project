@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 40e81e740d2f2e84db0a1d85eeb08a62
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Shaders/Conveyor.shader
+  uploadId: 544042

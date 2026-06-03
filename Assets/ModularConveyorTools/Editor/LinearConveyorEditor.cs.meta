@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 0d1ff990b4d212f4494a1a842a8d9156
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Editor/LinearConveyorEditor.cs
+  uploadId: 544042

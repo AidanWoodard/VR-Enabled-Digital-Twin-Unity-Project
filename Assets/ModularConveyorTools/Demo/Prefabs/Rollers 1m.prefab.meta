@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c69b7ad6bcf3b0446bfc568d55b5e447
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Rollers 1m.prefab
+  uploadId: 544042

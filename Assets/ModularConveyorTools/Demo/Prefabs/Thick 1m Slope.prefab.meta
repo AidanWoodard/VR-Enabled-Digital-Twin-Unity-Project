@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 08c9a1eae88791f4cbe9201fb3ae225b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Thick 1m Slope.prefab
+  uploadId: 544042

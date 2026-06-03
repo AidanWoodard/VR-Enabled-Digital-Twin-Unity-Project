@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b858351208aee0444bc8f1cd8a2e067e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Thin 3r.prefab
+  uploadId: 544042

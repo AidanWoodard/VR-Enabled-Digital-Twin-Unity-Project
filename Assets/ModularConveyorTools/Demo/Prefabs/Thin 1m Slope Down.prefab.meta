@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a99a05dcd53d3344986a3c194c78ccea
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Thin 1m Slope Down.prefab
+  uploadId: 544042

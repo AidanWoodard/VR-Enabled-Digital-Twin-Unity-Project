@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b863350774938eb4c9fb12b1af7fd456
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Animation/Fly.anim
+  uploadId: 544042

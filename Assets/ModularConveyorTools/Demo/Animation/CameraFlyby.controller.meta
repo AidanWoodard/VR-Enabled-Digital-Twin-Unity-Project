@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1a5f54cbe7623df4d810513708761584
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Animation/CameraFlyby.controller
+  uploadId: 544042

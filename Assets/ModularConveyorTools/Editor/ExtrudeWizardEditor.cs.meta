@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 2d905a9fe02dd2d47a40873938c0c0d0
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Editor/ExtrudeWizardEditor.cs
+  uploadId: 544042

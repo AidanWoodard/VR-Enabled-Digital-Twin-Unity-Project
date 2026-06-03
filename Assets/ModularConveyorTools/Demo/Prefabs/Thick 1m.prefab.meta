@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ccb336f4f60058b4cb7a33f295bfc447
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 120090
+  packageName: Modular Conveyor Tools
+  packageVersion: 1.2
+  assetPath: Assets/ModularConveyorTools/Demo/Prefabs/Thick 1m.prefab
+  uploadId: 544042
