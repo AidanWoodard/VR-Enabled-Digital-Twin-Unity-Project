@@ -12,6 +12,13 @@ public class JointStateSubscriber : MonoBehaviour
     // Map joint names to GameObjects
     private Dictionary<string, ArticulationBody> jointMap = new Dictionary<string, ArticulationBody>();
 
+    [Header("Calibration Settings")]
+    public bool useBufferCalibrationDelay = true;
+
+    private bool wasCalibrated = false;
+    private float calibratedTime = 0f;
+    private bool isReadyToMap = false;
+
     // ROS to Unity joint name mapping
     private string[] rosJointNames = new string[] {
         "joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint_gripper_right", "joint_gripper_left"
@@ -52,8 +59,39 @@ public class JointStateSubscriber : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        if (!pubtest.isCalibrated)
+        {
+            wasCalibrated = false;
+            isReadyToMap = false;
+        }
+        else
+        {
+            if (!wasCalibrated)
+            {
+                wasCalibrated = true;
+                calibratedTime = Time.time;
+            }
+
+            if (useBufferCalibrationDelay)
+            {
+                if (Time.time - calibratedTime >= 1.0f)
+                {
+                    isReadyToMap = true;
+                }
+            }
+            else
+            {
+                isReadyToMap = true;
+            }
+        }
+    }
+
     void JointStateCallback(JointStateMsg msg)
     {
+        if (!isReadyToMap) return;
+
         Debug.Log($"[ROS to Unity] Received JointState with {msg.name.Length} joints");
 
         for (int i = 0; i < msg.name.Length; i++)
