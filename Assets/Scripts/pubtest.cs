@@ -6,10 +6,15 @@ using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 using RosMessageTypes.BuiltinInterfaces;
 using System;
 using UnityEngine.XR;
+using UnityEngine.InputSystem;
 
 public class pubtest : MonoBehaviour
 {
     [SerializeField] Transform rightController;
+
+    [Header("Input System Action References")]
+    [SerializeField] private InputActionReference aButtonAction;    // primary button
+    [SerializeField] private InputActionReference bButtonAction;    // secondary button
 
     ROSConnection ros;
     public string topicName = "/sgr532/vr_target_pose";
@@ -25,18 +30,18 @@ public class pubtest : MonoBehaviour
     Quaternion controllerHomeRotation; //  NEW
     static readonly Vector3 rosEEHomeInBaseLink = new Vector3(0.308f, 0.00045f, 0.304f);
 
-    //gripper test 
-    InputDevice rightHand;
-    InputDevice leftHand;
-    bool fullyopen = false;
-    bool fullyclosed = true;
-    float grippervalue = 0.0000f;
-    bool rightTriggerPressed, leftTriggerPressed;
-    bool rightTriggerWasPressedLastFrame = false;
-    bool leftTriggerWasPressedLastFrame = false;
-    bool saveButtonPressed = false;
-    bool saveButtonJustPressed = false;
+    //gripper control (A = close, B = open, right controller only)
+    bool gripperOpenFull = false;
+    bool gripperClosedFull = true;
+    float gripperVal = 0.0000f;
+    private const float MIN_GRIPPER = -0.035f;              // Fully closed
+    private const float MAX_GRIPPER = 0.0f;                 // Fully opened
+    [SerializeField] private const float GRIPPER_INCREMENT = 0.0085f;
 
+    //// save position feat. (not in use, legacy)
+    //bool saveButtonPressed = false;
+    //bool saveButtonJustPressed = false;
+    //InputDevice rightHand;
 
     void Start()
     {
@@ -45,11 +50,13 @@ public class pubtest : MonoBehaviour
         ros.RegisterPublisher<PoseStampedMsg>(teachtopicname);
         ros.RegisterPublisher<Float64Msg>("/sgr532/gripper/command");
 
+        // reset claw
+        PublishGripperCommand(MAX_GRIPPER);
+
         startTime = Time.time;
 
-        //gripper initialize
-        rightHand = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
-        leftHand = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+        ////gripper initialize
+        //rightHand = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
     }
 
     void Update()
@@ -69,7 +76,7 @@ public class pubtest : MonoBehaviour
         }
         //gripper trigger
         CheckGripperTrigger();
-        CheckSaveButton();
+        //CheckSaveButton();        // omit, just use live hand tracking
         if (!isCalibrated) return;
 
         timeElapsed += Time.deltaTime;
@@ -80,59 +87,53 @@ public class pubtest : MonoBehaviour
         PublishControllerPose();
     }
 
-    void CheckSaveButton()
-    {
-        bool currentState = false;
-        rightHand.TryGetFeatureValue(CommonUsages.menuButton, out currentState);
+    //void CheckSaveButton()
+    //{
+    //    bool currentState = false;
+    //    rightHand.TryGetFeatureValue(CommonUsages.menuButton, out currentState);
 
-        if (currentState && !saveButtonPressed)
-        {
-            // Rising edge: just pressed
-            saveButtonJustPressed = true;
-            Debug.Log("[INPUT] Save button just pressed!");
-        }
+    //    if (currentState && !saveButtonPressed)
+    //    {
+    //        // Rising edge: just pressed
+    //        saveButtonJustPressed = true;
+    //        Debug.Log("[INPUT] Save button just pressed!");
+    //    }
 
-        saveButtonPressed = currentState; // track previous state
-    }
+    //    saveButtonPressed = currentState; // track previous state
+    //}
 
-
-    //gripper test
+    //gripper control - A button (close), B button (open), right controller only
     void CheckGripperTrigger()
     {
-        // Ensure both controllers are initialized
-        if (!rightHand.isValid)
-            rightHand = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
-        if (!leftHand.isValid)
-            leftHand = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
-
-        // Update gripper state flags
-        fullyclosed = grippervalue <= -0.034f;
-        fullyopen = grippervalue >= 0.0f;
-
-        // RIGHT HAND trigger (close gripper)
-        if (rightHand.TryGetFeatureValue(CommonUsages.triggerButton, out bool rightTriggerPressed))
+        if (aButtonAction == null || bButtonAction == null)
         {
-            if (rightTriggerPressed && !rightTriggerWasPressedLastFrame && !fullyclosed)
-            {
-                grippervalue -= 0.0085f;
-                grippervalue = Mathf.Clamp(grippervalue, -0.034f, 0.0f);
-                PublishGripperCommand(grippervalue);
-            }
-
-            rightTriggerWasPressedLastFrame = rightTriggerPressed;
+            Debug.LogWarning("ERROR: Missing references to Unity Input System Action. Make sure to apply in Editor.");
+            return;
         }
 
-        // LEFT HAND trigger (open gripper)
-        if (leftHand.TryGetFeatureValue(CommonUsages.triggerButton, out bool leftTriggerPressed))
-        {
-            if (leftTriggerPressed && !leftTriggerWasPressedLastFrame && !fullyopen)
-            {
-                grippervalue += 0.0085f;
-                grippervalue = Mathf.Clamp(grippervalue, -0.034f, 0.0f);
-                PublishGripperCommand(grippervalue);
-            }
+        bool aPressed = aButtonAction.action.IsPressed();
+        bool bPressed = bButtonAction.action.IsPressed();       // (race condition handled in elif)
+        float previousVal = gripperVal;
 
-            leftTriggerWasPressedLastFrame = leftTriggerPressed;
+        if (aPressed && !gripperClosedFull)
+        {
+            gripperVal -= GRIPPER_INCREMENT * Time.deltaTime;
+        }
+        else if (bPressed && !gripperOpenFull)
+        {
+            gripperVal += GRIPPER_INCREMENT * Time.deltaTime;
+        }
+
+        Debug.Log("[DEBUG] Gripper position: " + gripperVal);
+
+        // Update gripper state flags
+        gripperVal = Mathf.Clamp(gripperVal, MIN_GRIPPER, MAX_GRIPPER);
+        gripperClosedFull = gripperVal <= MIN_GRIPPER;
+        gripperOpenFull = gripperVal >= MAX_GRIPPER;
+
+        if (!Mathf.Approximately(gripperVal, previousVal))
+        {
+            PublishGripperCommand(gripperVal);
         }
     }
 
@@ -144,7 +145,6 @@ public class pubtest : MonoBehaviour
         var msg = new Float64Msg(value);
         ros.Publish("/sgr532/gripper/command", msg);
     }
-
 
     void PublishControllerPose()
     {
@@ -168,7 +168,6 @@ public class pubtest : MonoBehaviour
         // Compute orientation delta from calibration
         Quaternion deltaRot = currentRot * Quaternion.Inverse(controllerHomeRotation);
         var rosRot = new Quaternion(deltaRot.x, deltaRot.y, deltaRot.z, deltaRot.w);
-
         
         //DEBUG
         //Debug.Log($"uPos: {uPos}, FLU: {posF}");
@@ -191,12 +190,12 @@ public class pubtest : MonoBehaviour
         ros.Publish(topicName, new PoseStampedMsg(header, pose));
 
         //Send Current Pose to our Teach adn Repeat Topic 'teach_pose'
-        if (saveButtonJustPressed)
-        {
-            ros.Publish(teachtopicname, new PoseStampedMsg(header, pose));
-            Debug.Log($"[TEACH] Saved pose at position {finalPos} and orientation {rosRot}");
-            saveButtonJustPressed = false;
-        }
+        //if (saveButtonJustPressed)
+        //{
+        //    ros.Publish(teachtopicname, new PoseStampedMsg(header, pose));
+        //    Debug.Log($"[TEACH] Saved pose at position {finalPos} and orientation {rosRot}");
+        //    saveButtonJustPressed = false;
+        //}   
     }
 }
 

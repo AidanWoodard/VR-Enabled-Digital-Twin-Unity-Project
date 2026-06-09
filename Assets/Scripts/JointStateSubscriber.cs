@@ -15,6 +15,7 @@ public class JointStateSubscriber : MonoBehaviour
     [Header("Calibration Settings")]
     public bool useBufferCalibrationDelay = true;
 
+    [SerializeField] private float calibrationWaitTime = 2.0f;
     private bool wasCalibrated = false;
     private float calibratedTime = 0f;
     private bool isReadyToMap = false;
@@ -76,7 +77,7 @@ public class JointStateSubscriber : MonoBehaviour
 
             if (useBufferCalibrationDelay)
             {
-                if (Time.time - calibratedTime >= 1.0f)
+                if (Time.time - calibratedTime >= calibrationWaitTime)
                 {
                     isReadyToMap = true;
                 }

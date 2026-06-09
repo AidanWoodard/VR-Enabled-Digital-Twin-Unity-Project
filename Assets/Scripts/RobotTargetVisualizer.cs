@@ -114,7 +114,7 @@ public class RobotTargetVisualizer : MonoBehaviour
             //triggerPt3 != null ? triggerPt3.position : Vector3.zero,
         };
 
-        Debug.Log($"X position, zero vector: {triggerPoints[0] == Vector3.zero}");
+        //Debug.Log($"X position, zero vector: {triggerPoints[0] == Vector3.zero}");
 
         // ── 4. Delegate barrier detection to RobotBarrier ──
         // RobotBarrier.CheckPoints() finds all child colliders, checks each point against
