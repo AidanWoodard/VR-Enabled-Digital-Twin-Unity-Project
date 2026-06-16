@@ -11,7 +11,10 @@ public class XRInputDebugger : MonoBehaviour
     [SerializeField] private float analogLogThreshold = 0.05f;
 
     // --- Analog axes ---
-    private InputAction _leftTrigger;
+    [SerializeField] private bool enableDebugger = true;
+
+    
+private InputAction _leftTrigger;
     private InputAction _rightTrigger;
     private InputAction _leftGrip;
     private InputAction _rightGrip;
@@ -80,13 +83,13 @@ public class XRInputDebugger : MonoBehaviour
 
     void LogAnalog(string name, float val)
     {
-        if (Mathf.Abs(val) > analogLogThreshold)
+        if (enableDebugger && Mathf.Abs(val) > analogLogThreshold)
             Debug.Log($"[XRInput] {name}: {val:F3}");
     }
 
     void LogAnalog2D(string name, Vector2 val)
     {
-        if (val.magnitude > analogLogThreshold)
+        if (enableDebugger && val.magnitude > analogLogThreshold)
             Debug.Log($"[XRInput] {name}: ({val.x:F3}, {val.y:F3})");
     }
 
@@ -145,9 +148,9 @@ public class XRInputDebugger : MonoBehaviour
         Register(_rightGripBtn,   "R.GripBtn");
     }
 
-    void Register(InputAction action, string label)
+void Register(InputAction action, string label)
     {
-        action.performed += ctx => Debug.Log($"[XRInput] {label} PRESSED");
-        action.canceled  += ctx => Debug.Log($"[XRInput] {label} released");
+        action.performed += ctx => { if (enableDebugger) Debug.Log("[XRInput] " + label + " PRESSED"); };
+        action.canceled  += ctx => { if (enableDebugger) Debug.Log("[XRInput] " + label + " released"); };
     }
 }
