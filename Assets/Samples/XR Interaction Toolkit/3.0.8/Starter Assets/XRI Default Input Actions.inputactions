@@ -96,7 +96,7 @@
                     "path": "<HandheldARInputDevice>/devicePosition",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";HTC Vive Headset, Valve Index Controllers",
                     "action": "Position",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -118,7 +118,7 @@
                     "path": "<HandheldARInputDevice>/deviceRotation",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";HTC Vive Headset, Valve Index Controllers",
                     "action": "Rotation",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -2522,16 +2522,16 @@
                     "name": "Submit",
                     "type": "Button",
                     "id": "eba98c2e-6268-4233-bb88-946287bc753c",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
-                    "initialStateCheck": false
+                    "initialStateCheck": true
                 },
                 {
                     "name": "Cancel",
                     "type": "Button",
                     "id": "448b396b-0885-4543-ac5a-8b3405da6791",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -2948,6 +2948,17 @@
                 },
                 {
                     "name": "",
+                    "id": "59e4a972-ff61-4fc1-9fa3-c924d6435b10",
+                    "path": "<XRController>{RightHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";HTC Vive Headset, Valve Index Controllers",
+                    "action": "Submit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "67f51768-1493-4444-b118-82d398a16fdd",
                     "path": "*/{Cancel}",
                     "interactions": "",
@@ -2964,6 +2975,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
+                    "action": "Click",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3b443c3d-d632-4c6e-827d-3c0420d6b2a6",
+                    "path": "<XRController>{RightHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";HTC Vive Headset, Valve Index Controllers",
                     "action": "Click",
                     "isComposite": false,
                     "isPartOfComposite": false

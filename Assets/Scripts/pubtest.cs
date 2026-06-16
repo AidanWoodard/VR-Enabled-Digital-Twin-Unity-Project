@@ -124,7 +124,7 @@ public class pubtest : MonoBehaviour
             gripperVal += GRIPPER_INCREMENT * Time.deltaTime;
         }
 
-        Debug.Log("[DEBUG] Gripper position: " + gripperVal);
+        //Debug.Log("[DEBUG] Gripper position: " + gripperVal);
 
         // Update gripper state flags
         gripperVal = Mathf.Clamp(gripperVal, MIN_GRIPPER, MAX_GRIPPER);
@@ -138,16 +138,18 @@ public class pubtest : MonoBehaviour
     }
 
     //gripper test
-    void PublishGripperCommand(float value)
+void PublishGripperCommand(float value)
     {
+        if (!ROSPublishToggle.IsPublishingEnabled) return;
         if (RobotBarrier.isCollisionActive) return;
 
         var msg = new Float64Msg(value);
         ros.Publish("/sgr532/gripper/command", msg);
     }
 
-    void PublishControllerPose()
+void PublishControllerPose()
     {
+        if (!ROSPublishToggle.IsPublishingEnabled) return;
         if (rightController == null)
         {
             Debug.LogWarning("Right controller not assigned.");
@@ -168,9 +170,6 @@ public class pubtest : MonoBehaviour
         // Compute orientation delta from calibration
         Quaternion deltaRot = currentRot * Quaternion.Inverse(controllerHomeRotation);
         var rosRot = new Quaternion(deltaRot.x, deltaRot.y, deltaRot.z, deltaRot.w);
-        
-        //DEBUG
-        //Debug.Log($"uPos: {uPos}, FLU: {posF}");
 
         double now = Time.realtimeSinceStartup;
         uint secs = (uint)Math.Floor(now);
@@ -188,14 +187,6 @@ public class pubtest : MonoBehaviour
         );
 
         ros.Publish(topicName, new PoseStampedMsg(header, pose));
-
-        //Send Current Pose to our Teach adn Repeat Topic 'teach_pose'
-        //if (saveButtonJustPressed)
-        //{
-        //    ros.Publish(teachtopicname, new PoseStampedMsg(header, pose));
-        //    Debug.Log($"[TEACH] Saved pose at position {finalPos} and orientation {rosRot}");
-        //    saveButtonJustPressed = false;
-        //}   
     }
 }
 

@@ -28,7 +28,7 @@ public class CameraSubscriber : MonoBehaviour
         //}
 
         // Initialize an empty texture texture (matching your camera's 640x480 resolution)
-        texture2D = new Texture2D(640, 480, TextureFormat.RGB24, false);
+        texture2D = new Texture2D(1280, 960, TextureFormat.RGB24, false);
         targetUiCanvas.texture = texture2D;
 
         // Register the subscriber directly with the ROS-TCP network manager
