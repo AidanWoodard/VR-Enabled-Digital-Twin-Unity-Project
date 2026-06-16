@@ -3,8 +3,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Hold both controller triggers for holdDuration seconds to toggle ROS publishing on/off.
-/// Uses generic XR controller bindings — works with any OpenXR-compatible controller.
-/// Attach this to any active GameObject in the scene.
+/// Attach to any active GameObject in the scene.
 /// </summary>
 public class ROSPublishToggle : MonoBehaviour
 {
@@ -13,8 +12,11 @@ public class ROSPublishToggle : MonoBehaviour
     [Tooltip("Seconds both triggers must be held to toggle publishing.")]
     [SerializeField] private float holdDuration = 1.0f;
 
-    [Tooltip("Analog threshold above which a trigger counts as 'pressed'.")]
-    [SerializeField] private float triggerThreshold = 0.8f;
+    [Tooltip("Analog threshold (0-1) above which a trigger counts as held.")]
+    [SerializeField] private float triggerThreshold = 0.85f;
+
+    [Tooltip("Log trigger values every frame for debugging.")]
+    [SerializeField] private bool debugLog = true;
 
     private InputAction _leftTrigger;
     private InputAction _rightTrigger;
@@ -24,8 +26,18 @@ public class ROSPublishToggle : MonoBehaviour
 
     void Awake()
     {
-        _leftTrigger  = new InputAction("LeftTrigger",  binding: "<XRController>{LeftHand}/trigger");
-        _rightTrigger = new InputAction("RightTrigger", binding: "<XRController>{RightHand}/trigger");
+        // InputActionType.Value so ReadValue<float>() returns the raw analog axis,
+        // not a binary button state with a press threshold applied.
+        _leftTrigger  = new InputAction("LeftTrigger",  type: InputActionType.Value, expectedControlType: "Axis");
+        _rightTrigger = new InputAction("RightTrigger", type: InputActionType.Value, expectedControlType: "Axis");
+
+        // Generic XRController covers most devices; ValveIndexController is the
+        // specific layout SteamVR/OpenXR registers for Index controllers.
+        _leftTrigger.AddBinding("<XRController>{LeftHand}/trigger");
+        _leftTrigger.AddBinding("<ValveIndexController>{LeftHand}/trigger");
+        _rightTrigger.AddBinding("<XRController>{RightHand}/trigger");
+        _rightTrigger.AddBinding("<ValveIndexController>{RightHand}/trigger");
+
         _leftTrigger.Enable();
         _rightTrigger.Enable();
     }
@@ -40,8 +52,16 @@ public class ROSPublishToggle : MonoBehaviour
 
     void Update()
     {
-        bool bothHeld = _leftTrigger.ReadValue<float>()  > triggerThreshold
-                     && _rightTrigger.ReadValue<float>() > triggerThreshold;
+        float lVal = _leftTrigger.ReadValue<float>();
+        float rVal = _rightTrigger.ReadValue<float>();
+        bool bothHeld = lVal > triggerThreshold && rVal > triggerThreshold;
+
+        if (debugLog)
+            Debug.Log("[ROSPublishToggle] L=" + lVal.ToString("F2") +
+                      " R=" + rVal.ToString("F2") +
+                      " bothHeld=" + bothHeld +
+                      " heldTime=" + _bothHeldTime.ToString("F2") +
+                      " publishing=" + IsPublishingEnabled);
 
         if (bothHeld)
         {
@@ -50,7 +70,7 @@ public class ROSPublishToggle : MonoBehaviour
             {
                 IsPublishingEnabled = !IsPublishingEnabled;
                 _toggleFired = true;
-                Debug.Log($"[ROSPublishToggle] Publishing {(IsPublishingEnabled ? "ENABLED" : "DISABLED")}");
+                Debug.Log("[ROSPublishToggle] Publishing " + (IsPublishingEnabled ? "ENABLED" : "DISABLED"));
             }
         }
         else
