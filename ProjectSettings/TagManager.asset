@@ -9,6 +9,7 @@ TagManager:
   - robot_barrier_detector
   - robot_barrier_inverted
   - db_button
+  - command_ui
   layers:
   - Default
   - TransparentFX

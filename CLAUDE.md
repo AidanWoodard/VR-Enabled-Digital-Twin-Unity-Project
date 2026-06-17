@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Hardware:** HTC Vive headset + Valve Index controllers. SteamVR must be running as the active OpenXR runtime before entering Play mode.
 
+**ROS workspace location:** The actual in-use ROS workspace is `~/../../ROS_Files/sagittarius_ws/` on the Linux ROS machine. The `REU2026\OldROSFiles\sagittarius_ws\` folder in this repo is **out of date** — do not treat it as the source of truth for ROS-side code.
+
 ## Unity Editor Workflow
 
 This project has no CLI build or test pipeline. All development happens in the Unity Editor:
@@ -67,10 +69,14 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 | `RobotBarrier.cs` | `Assets/Scripts/` | Collision detection; sets `isCollisionActive` |
 | `JointStateSubscriber.cs` | `Assets/Scripts/` | Subscribes to joint states from ROS |
 | `RobotDashboard.cs` | `Assets/Scripts/` | Legacy placeholder — superseded by `CommandSlotDashboard.cs` |
-| `CommandSlotDashboard.cs` | `Assets/Scripts/` | 5-slot record/play/clear dashboard; manages slot state machine, ROS service calls, radial hold-to-clear mechanic |
+| `CommandSlotDashboard.cs` | `Assets/Scripts/` | 5-slot record/play/clear dashboard; self-discovers rows, manages slot state machine, ROS service calls, radial hold-to-clear mechanic |
+| `SlotRowBinding.cs` | `Assets/Scripts/` | Per-row reference holder (`slotIndex`, `statusDot`, `recordButton`, `playButton`, `actionLabel`, `clearFillOverlay`); tagged `command_ui` on the prefab |
 | `VRPosePublisher.cs` / `VRPosePublisher2.cs` | `Assets/Scripts/` | Additional pose publishers (alternate or legacy) |
 
 ## Dashboard Architecture
+
+### Slot Discovery (no manual Inspector wiring)
+`CommandSlotDashboard.cs` no longer has a hand-wired `SlotRow[]` Inspector array. In `Awake()` it calls `GetComponentsInChildren<SlotRowBinding>()`, filters/warns on the `command_ui` tag, and sorts by each binding's `slotIndex` (0–4) to build its internal `slots` array. To add/rewire a row in the prefab: add a `SlotRowBinding` component to the row's GameObject, tag it `command_ui`, set `slotIndex`, and wire its 5 fields locally — no changes needed on the `CommandSlotDashboard` component itself.
 
 ### Slot State Machine
 `CommandSlotDashboard.cs` tracks 5 independent slots. Each slot cycles: `Empty → HasRecording → Recording / Playing → HasRecording`.
@@ -78,6 +84,13 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 - **Record**: keeps live publishing enabled (user puppets arm; ROS records the pose stream).
 - **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; re-enables on stop.
 - **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty.
+
+### Morphing Record/Stop/Clear Button
+There is no separate `stopClearButton` GameObject anymore. `recordButton` itself morphs in place via `EventTrigger` PointerDown/Up (not `Button.onClick`, to avoid double-firing with the hold-to-clear gesture):
+- `Empty` → label `RECORD`, instant action on press: start recording.
+- `Recording` / `Playing` → label `STOP` (dot color distinguishes which), instant action: stop the active slot.
+- `HasRecording` → label `CLEAR`, requires the 1 s hold (radial `clearFillOverlay`, now parented under `recordButton` instead of a dedicated button).
+`playButton` is untouched by this — it stays a separate button, interactable only when `HasRecording`.
 
 ### ROS Services (unity_vr_control package)
 | Service | .srv file | Purpose |
@@ -91,12 +104,70 @@ ROS node: `unity_vr_control/scripts/dashboard_controller.py`. Bags stored in `~/
 
 C# message classes live in `Assets/RosMessages/Dashboard/srv/` under namespace `RosMessageTypes.Dashboard`.
 
-### UI Prefab (Dashboard scene)
-5 `SlotRow` children inside a Vertical Layout Group. Each row has:
-- `statusDot` Image (color = state)
-- `recordButton`, `playButton`
-- `stopClearButton` with a child `clearFillOverlay` Image (`fillMethod=Radial360`, orange tint)
-All slot refs wired in the Inspector on the `CommandSlotDashboard` component.
+### UI Prefab (`Assets/Prefabs/Dashboard.prefab`)
+5 `Slot{N}Row` children (tagged `command_ui`) inside a Vertical Layout Group, each with a `SlotRowBinding` component. Per row:
+- `StatusDot` Image (color = state)
+- `RecordButton` — the morphing Record/Stop/Clear button, with children `Label` (text) and `ClearFillOverlay` Image (`fillMethod=Radial360`, orange tint, inactive by default)
+- `PlayButton` — separate, untouched by the morph mechanic
 
 ## Coordinate System
 ROS uses FLU (Forward-Left-Up). Unity uses RUF (Right-Up-Forward). All pose conversions go through `.To<FLU>()` extension methods from `Unity.Robotics.ROSTCPConnector.ROSGeometry`. Quaternions must be manually reconstructed after conversion — the `.To<FLU>()` return type is not a `UnityEngine.Quaternion`.
+
+## TODO
+
+### Stop button gets permanently stuck after a bag finishes playing to completion
+
+**Symptom:** The morphing `recordButton` (showing `STOP` during playback) works fine right after Record, but becomes unresponsive specifically once a `.bag` plays through to its natural end without the user pressing Stop first. After that: the slot's status dot stays green (`Playing`) forever, pressing Stop on that slot does nothing, other slots' buttons keep working normally, and starting playback on a *different* slot leaves the original slot's dot stuck green instead of resetting.
+
+**Investigation already done (do not re-derive — verified by direct code reads, not just static guessing):**
+- Ruled out the Unity state machine logic in `CommandSlotDashboard.cs` — `OnMorphButtonDown()` → `StopActiveSlot()` is correctly wired and identical for `Recording` and `Playing` states.
+- Ruled out ROS connectivity/timeouts — confirmed ROS connected, Unity console clean during repro.
+- Ruled out any script gating the XR ray/raycaster/EventSystem off `ROSPublishToggle.IsPublishingEnabled` — grepped the whole `Assets/Scripts` folder; no such script exists. `IsPublishingEnabled` only gates ROS message publishing in `pubtest.cs`.
+- Confirmed via user re-hover test that the button itself correctly receives VR pointer input — the failure is not an input/EventTrigger/raycaster issue.
+
+**Confirmed root cause (server-side):** `dashboard_controller.py`, `handle_playback()`'s stop branch:
+
+```python
+proc = playback_procs.pop(slot, None)
+if proc is None or proc.poll() is not None:
+    return DashboardPlaybackResponse(success=False, message=f"Slot {slot} not playing")
+```
+
+When `rosbag play` reaches end-of-bag, the subprocess exits on its own and `proc.poll()` becomes non-`None`. Unity is never told playback ended, so it still thinks the slot is `Playing`. When the user later presses Stop, this handler sees the process already dead and returns `success=False` ("Slot N not playing") instead of treating "already stopped" as a successful no-op.
+
+Back in `CommandSlotDashboard.cs::StopActiveSlot()` (~lines 176-187), the state reset (`activeSlot = -1`, `states[slot] = HasRecording`, `ROSPublishToggle.IsPublishingEnabled = true`, `UpdateSlotUI(slot)`) only runs `if (resp.success)`. Since the response is `false`, the slot is stuck permanently. This also explains the "stuck dot when switching slots" symptom: in `OnPlayClicked`'s redirect path, `StopActiveSlot(onComplete)`'s `onComplete?.Invoke()` (which starts the new slot's playback) fires unconditionally regardless of `resp.success` (~line 184), so the new slot proceeds while the old slot's UI is abandoned mid-update.
+
+**Note on file locations:** Per this file's own ROS workspace note above, the *live* `dashboard_controller.py` is at `~/../../ROS_Files/sagittarius_ws/src/sagittarius_arm_ros/unity_vr_control/scripts/dashboard_controller.py` on the separate Linux ROS machine — not reachable from this Windows filesystem. The local mirror at `D:\Aidan\REU2026\OldROSFiles\sagittarius_ws\src\sagittarius_arm_ros\unity_vr_control\scripts\dashboard_controller.py` is out of date and not what actually runs, but should still get the same fix applied for reference/consistency.
+
+**Fix — ROS side (primary), `handle_playback()`:** Treat "stop requested but process already exited on its own" as success, not failure:
+
+```python
+else:
+    proc = playback_procs.pop(slot, None)
+    if proc is None:
+        return DashboardPlaybackResponse(success=False, message=f"Slot {slot} not playing")
+    if proc.poll() is not None:
+        # Bag already finished on its own — stopping is a no-op, but it IS stopped.
+        return DashboardPlaybackResponse(success=True, message=f"Slot {slot} playback already finished")
+
+    proc.send_signal(signal.SIGINT)
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+    rospy.loginfo(f"[Dashboard] Playback stopped for slot {slot}")
+    return DashboardPlaybackResponse(success=True, message=f"Playback stopped for slot {slot}")
+```
+
+Apply this on the live Linux file first, then mirror it into the local out-of-date copy. For full consistency, `handle_record()`'s stop branch has the identical pattern (process-already-exited treated as failure) — same idempotent-stop treatment should apply there too, though lower priority since recordings don't end "on their own" the way bag playback does.
+
+**Fix — Unity side (defensive resilience, secondary/optional):** In `CommandSlotDashboard.cs::StopActiveSlot()`, consider always clearing `activeSlot = -1` in the response callback regardless of `resp.success`, and only conditionally restoring richer state (`states[slot] = HasRecording`, re-enabling publishing) on success. This prevents any future "ROS returns failure on stop" scenario from permanently stranding a slot, independent of this specific bag-completion case.
+
+**Verification steps:**
+1. Apply the ROS-side fix on the live Linux file, restart `dashboard_controller.py` (or the relevant roslaunch).
+2. In Unity Play mode (SteamVR running, ROS TCP endpoint active): Record a short clip in a slot, Play it, and let it play to completion without touching Stop.
+3. Confirm the slot's dot returns to `HasRecording` (cyan) automatically or via Stop press, and the button becomes responsive again.
+4. Confirm starting playback on a different slot no longer leaves the first slot's dot stuck green.
+5. Check Unity Console and ROS terminal for `[Dashboard] Playback stopped for slot N` — no more `success=False` "not playing" warnings after natural bag completion.
+
+Full plan also saved at `C:\Users\xrlab23\.claude\plans\i-m-having-issues-with-greedy-emerson.md`.

@@ -2,9 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using TMPro;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Dashboard;
 
@@ -12,26 +10,14 @@ public class CommandSlotDashboard : MonoBehaviour
 {
     public enum SlotState { Empty, HasRecording, Recording, Playing }
 
-    [Serializable]
-    public class SlotRow
-    {
-        public Image statusDot;
-        public Button recordButton;
-        public Button playButton;
-        public Button stopClearButton;
-        public TextMeshProUGUI stopClearLabel;
-        public Image clearFillOverlay;  // child Image, fillMethod=Radial360, tinted orange
-    }
-
-    [SerializeField] SlotRow[] slots = new SlotRow[5];
-
+    SlotRowBinding[] slots;
     SlotState[] states = new SlotState[5];
     int activeSlot = -1;
 
-    static readonly Color ColorEmpty       = new Color(0.45f, 0.45f, 0.45f);
+    static readonly Color ColorEmpty        = new Color(0.45f, 0.45f, 0.45f);
     static readonly Color ColorHasRecording = new Color(0f,   0.75f, 0.75f);
-    static readonly Color ColorRecording   = new Color(0.9f,  0.15f, 0.15f);
-    static readonly Color ColorPlaying     = new Color(0.15f, 0.85f, 0.3f);
+    static readonly Color ColorRecording    = new Color(0.9f,  0.15f, 0.15f);
+    static readonly Color ColorPlaying      = new Color(0.15f, 0.85f, 0.3f);
 
     const string SVC_RECORD   = "dashboard/record";
     const string SVC_PLAYBACK = "dashboard/playback";
@@ -42,6 +28,20 @@ public class CommandSlotDashboard : MonoBehaviour
     Coroutine clearCoroutine;
     int clearCoroutineSlot = -1;
 
+    void Awake()
+    {
+        var bindings = GetComponentsInChildren<SlotRowBinding>(true);
+        if (bindings.Length != 5)
+            Debug.LogError($"[Dashboard] Expected 5 SlotRowBinding children, found {bindings.Length}");
+
+        foreach (var b in bindings)
+            if (!b.CompareTag("command_ui"))
+                Debug.LogWarning($"[Dashboard] SlotRowBinding on {b.name} missing 'command_ui' tag");
+
+        Array.Sort(bindings, (a, b) => a.slotIndex.CompareTo(b.slotIndex));
+        slots = bindings;
+    }
+
     void Start()
     {
         var ros = ROSConnection.GetOrCreateInstance();
@@ -50,17 +50,16 @@ public class CommandSlotDashboard : MonoBehaviour
         ros.RegisterRosService<DashboardQuerySlotsRequest, DashboardQuerySlotsResponse>(SVC_QUERY);
         ros.RegisterRosService<DashboardClearRequest,      DashboardClearResponse>(SVC_CLEAR);
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < slots.Length; i++)
         {
             int idx = i;
-            slots[i].recordButton.onClick.AddListener(() => OnRecordClicked(idx));
             slots[i].playButton.onClick.AddListener(() => OnPlayClicked(idx));
-            WireStopClearButton(idx);
+            WireMorphButton(idx);
             slots[i].clearFillOverlay.fillAmount = 0f;
             slots[i].clearFillOverlay.gameObject.SetActive(false);
         }
 
-        for (int i = 0; i < 5; i++) UpdateSlotUI(i);
+        for (int i = 0; i < slots.Length; i++) UpdateSlotUI(i);
 
         ros.SendServiceMessage<DashboardQuerySlotsResponse>(
             SVC_QUERY,
@@ -81,28 +80,22 @@ public class CommandSlotDashboard : MonoBehaviour
     {
         mainThreadQueue.Enqueue(() =>
         {
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < slots.Length; i++)
                 states[i] = resp.has_recording[i] ? SlotState.HasRecording : SlotState.Empty;
-            for (int i = 0; i < 5; i++) UpdateSlotUI(i);
+            for (int i = 0; i < slots.Length; i++) UpdateSlotUI(i);
         });
     }
 
     // ── Record ────────────────────────────────────────────────────────────────
 
-    void OnRecordClicked(int slot)
+    void StartRecording(int slot)
     {
-        if (states[slot] == SlotState.Recording) return;
-
         if (activeSlot >= 0 && activeSlot != slot)
         {
             StopActiveSlot(() => StartRecording(slot));
             return;
         }
-        StartRecording(slot);
-    }
 
-    void StartRecording(int slot)
-    {
         activeSlot = slot;
         var req = new DashboardRecordRequest(slot + 1, true);
         ROSConnection.GetOrCreateInstance().SendServiceMessage<DashboardRecordResponse>(SVC_RECORD, req, resp =>
@@ -199,39 +192,45 @@ public class CommandSlotDashboard : MonoBehaviour
         }
     }
 
-    // ── Stop/Clear button wiring ───────────────────────────────────────────────
+    // ── Morph button wiring (Record / Stop / Clear share one button) ──────────
 
-    void WireStopClearButton(int slot)
+    void WireMorphButton(int slot)
     {
-        var go = slots[slot].stopClearButton.gameObject;
+        var go = slots[slot].recordButton.gameObject;
         var trigger = go.GetComponent<EventTrigger>() ?? go.AddComponent<EventTrigger>();
 
         var down = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
-        down.callback.AddListener(_ => OnStopClearDown(slot));
+        down.callback.AddListener(_ => OnMorphButtonDown(slot));
         trigger.triggers.Add(down);
 
         var up = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
-        up.callback.AddListener(_ => OnStopClearUp(slot));
+        up.callback.AddListener(_ => OnMorphButtonUp(slot));
         trigger.triggers.Add(up);
     }
 
-    void OnStopClearDown(int slot)
+    void OnMorphButtonDown(int slot)
     {
-        if (states[slot] == SlotState.HasRecording)
+        Debug.Log("Morphing button pressed!");
+        switch (states[slot])
         {
-            // Begin hold-to-clear
-            if (clearCoroutine != null) StopCoroutine(clearCoroutine);
-            clearCoroutineSlot = slot;
-            slots[slot].clearFillOverlay.gameObject.SetActive(true);
-            clearCoroutine = StartCoroutine(ClearHoldRoutine(slot));
-        }
-        else if (states[slot] == SlotState.Recording || states[slot] == SlotState.Playing)
-        {
-            StopActiveSlot();
+            case SlotState.Empty:
+                StartRecording(slot);
+                break;
+            case SlotState.Recording:
+            case SlotState.Playing:
+                if (slot == activeSlot) StopActiveSlot();
+                break;
+            case SlotState.HasRecording:
+                // Begin hold-to-clear
+                if (clearCoroutine != null) StopCoroutine(clearCoroutine);
+                clearCoroutineSlot = slot;
+                slots[slot].clearFillOverlay.gameObject.SetActive(true);
+                clearCoroutine = StartCoroutine(ClearHoldRoutine(slot));
+                break;
         }
     }
 
-    void OnStopClearUp(int slot)
+    void OnMorphButtonUp(int slot)
     {
         // Cancel clear hold if not yet completed
         if (clearCoroutine != null && clearCoroutineSlot == slot)
@@ -298,16 +297,16 @@ public class CommandSlotDashboard : MonoBehaviour
             _                      => ColorEmpty
         };
 
-        row.recordButton.interactable   = state != SlotState.Recording && state != SlotState.Playing && !otherActive;
-        row.playButton.interactable     = state == SlotState.HasRecording && !otherActive;
-
-        bool showStopClear = state != SlotState.Empty;
-        row.stopClearButton.gameObject.SetActive(showStopClear);
-        if (showStopClear)
+        row.actionLabel.text = state switch
         {
-            bool isStopMode = state == SlotState.Recording || state == SlotState.Playing;
-            row.stopClearLabel.text = isStopMode ? "STOP" : "CLEAR";
-            row.stopClearButton.interactable = true;
-        }
+            SlotState.Empty        => "RECORD",
+            SlotState.HasRecording => "CLEAR",
+            SlotState.Recording    => "STOP",
+            SlotState.Playing      => "STOP",
+            _                      => "RECORD"
+        };
+        row.recordButton.interactable = !otherActive;
+
+        row.playButton.interactable = state == SlotState.HasRecording && !otherActive;
     }
 }
