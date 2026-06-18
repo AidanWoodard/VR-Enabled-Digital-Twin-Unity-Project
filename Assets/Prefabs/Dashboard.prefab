@@ -201,8 +201,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 530, y: 560}
+  m_AnchoredPosition: {x: 105.55, y: 69.92}
+  m_SizeDelta: {x: 318.89, y: 420.16}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &6175563222848481520
 Canvas:
@@ -386,7 +386,7 @@ MonoBehaviour:
     m_Right: 4
     m_Top: 2
     m_Bottom: 2
-  m_ChildAlignment: 3
+  m_ChildAlignment: 4
   m_Spacing: 5
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1
@@ -1247,7 +1247,7 @@ MonoBehaviour:
     m_Right: 4
     m_Top: 2
     m_Bottom: 2
-  m_ChildAlignment: 3
+  m_ChildAlignment: 4
   m_Spacing: 5
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1
@@ -1532,7 +1532,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2389425538035902204}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.000023698907}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1598,13 +1598,13 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 11.8
-  m_fontSizeBase: 11.8
+  m_fontSize: 23.04
+  m_fontSizeBase: 23.04
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
@@ -1636,7 +1636,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 51.7416, y: 0, z: 51.33114, w: 22.015972}
+  m_margin: {x: 51.7416, y: 0, z: 51.33114, w: 2.9278383}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -1878,7 +1878,7 @@ MonoBehaviour:
     m_Right: 4
     m_Top: 2
     m_Bottom: 2
-  m_ChildAlignment: 3
+  m_ChildAlignment: 4
   m_Spacing: 5
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1
@@ -3221,7 +3221,7 @@ MonoBehaviour:
     m_Right: 4
     m_Top: 2
     m_Bottom: 2
-  m_ChildAlignment: 3
+  m_ChildAlignment: 4
   m_Spacing: 5
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1
@@ -4799,7 +4799,7 @@ MonoBehaviour:
     m_Right: 4
     m_Top: 2
     m_Bottom: 2
-  m_ChildAlignment: 3
+  m_ChildAlignment: 4
   m_Spacing: 5
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1

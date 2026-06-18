@@ -113,9 +113,9 @@ C# message classes live in `Assets/RosMessages/Dashboard/srv/` under namespace `
 ## Coordinate System
 ROS uses FLU (Forward-Left-Up). Unity uses RUF (Right-Up-Forward). All pose conversions go through `.To<FLU>()` extension methods from `Unity.Robotics.ROSTCPConnector.ROSGeometry`. Quaternions must be manually reconstructed after conversion — the `.To<FLU>()` return type is not a `UnityEngine.Quaternion`.
 
-## TODO
+## TODO (resolved)
 
-### Stop button gets permanently stuck after a bag finishes playing to completion
+### Stop button gets permanently stuck after a bag finishes playing to completion — FIXED 2026-06-18
 
 **Symptom:** The morphing `recordButton` (showing `STOP` during playback) works fine right after Record, but becomes unresponsive specifically once a `.bag` plays through to its natural end without the user pressing Stop first. After that: the slot's status dot stays green (`Playing`) forever, pressing Stop on that slot does nothing, other slots' buttons keep working normally, and starting playback on a *different* slot leaves the original slot's dot stuck green instead of resetting.
 
@@ -171,3 +171,5 @@ Apply this on the live Linux file first, then mirror it into the local out-of-da
 5. Check Unity Console and ROS terminal for `[Dashboard] Playback stopped for slot N` — no more `success=False` "not playing" warnings after natural bag completion.
 
 Full plan also saved at `C:\Users\xrlab23\.claude\plans\i-m-having-issues-with-greedy-emerson.md`.
+
+**Resolution (2026-06-18):** Applied on the live ROS file (`~/ROS_Files/sagittarius_ws/src/unity_vr_control/scripts/dashboard_controller.py`, edited via WSL), the local mirrors, and `CommandSlotDashboard.cs::StopActiveSlot()`. `handle_playback()` and `handle_record()` now both return `success=True` ("already finished") when the subprocess already exited on its own, instead of `success=False`. `StopActiveSlot()` now always clears `activeSlot` regardless of `resp.success`, only restoring `HasRecording`/re-enabling publishing on success — so a slot can never get permanently stranded. **The live `dashboard_controller.py` node must be restarted (re-run its roslaunch/script) for this fix to take effect.**

@@ -21,6 +21,10 @@ public class RobotBarrier : MonoBehaviour
     {
         Collider[] childColliders = GetComponentsInChildren<Collider>();
 
+        // Don't visually flag barriers while recording a bag or while active control is paused
+        // (held both triggers) — the tracked points aren't meaningfully driving the arm in either case.
+        bool barriersVisuallySuppressed = CommandSlotDashboard.IsRecording || !ROSPublishToggle.IsPublishingEnabled;
+
         bool anyViolation = false;
         string hitColliderName = "";
         string hitColliderTag = "";
@@ -59,7 +63,7 @@ public class RobotBarrier : MonoBehaviour
             // Toggle this collider's MeshRenderer based on its own result
             MeshRenderer rend = col.GetComponent<MeshRenderer>();
             if (rend != null)
-                rend.enabled = colViolated;
+                rend.enabled = colViolated && !barriersVisuallySuppressed;
 
             if (colViolated)
                 anyViolation = true;

@@ -14,6 +14,8 @@ public class CommandSlotDashboard : MonoBehaviour
     SlotState[] states = new SlotState[5];
     int activeSlot = -1;
 
+    public static bool IsRecording = false;
+
     static readonly Color ColorEmpty        = new Color(0.45f, 0.45f, 0.45f);
     static readonly Color ColorHasRecording = new Color(0f,   0.75f, 0.75f);
     static readonly Color ColorRecording    = new Color(0.9f,  0.15f, 0.15f);
@@ -105,6 +107,7 @@ public class CommandSlotDashboard : MonoBehaviour
                 if (resp.success)
                 {
                     states[slot] = SlotState.Recording;
+                    IsRecording = true;
                     UpdateSlotUI(slot);
                 }
                 else
@@ -168,7 +171,10 @@ public class CommandSlotDashboard : MonoBehaviour
             {
                 mainThreadQueue.Enqueue(() =>
                 {
-                    if (resp.success) { states[slot] = SlotState.HasRecording; activeSlot = -1; UpdateSlotUI(slot); }
+                    activeSlot = -1;
+                    IsRecording = false;
+                    if (resp.success) { states[slot] = SlotState.HasRecording; }
+                    UpdateSlotUI(slot);
                     onComplete?.Invoke();
                 });
             });
@@ -180,7 +186,9 @@ public class CommandSlotDashboard : MonoBehaviour
             {
                 mainThreadQueue.Enqueue(() =>
                 {
-                    if (resp.success) { states[slot] = SlotState.HasRecording; activeSlot = -1; ROSPublishToggle.IsPublishingEnabled = true; UpdateSlotUI(slot); }
+                    activeSlot = -1;
+                    if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = true; }
+                    UpdateSlotUI(slot);
                     onComplete?.Invoke();
                 });
             });
