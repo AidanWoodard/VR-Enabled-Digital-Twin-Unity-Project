@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class ROSPublishToggle : MonoBehaviour
 {
-    public static bool IsPublishingEnabled = true;
+    public static bool IsPublishingEnabled = false;
 
     [Tooltip("Seconds both triggers must be held to toggle publishing.")]
     [SerializeField] private float holdDuration = 1.0f;

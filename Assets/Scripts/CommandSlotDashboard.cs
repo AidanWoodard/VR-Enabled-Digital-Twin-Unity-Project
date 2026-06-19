@@ -173,7 +173,7 @@ public class CommandSlotDashboard : MonoBehaviour
                 {
                     activeSlot = -1;
                     IsRecording = false;
-                    if (resp.success) { states[slot] = SlotState.HasRecording; }
+                    if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = false; }
                     UpdateSlotUI(slot);
                     onComplete?.Invoke();
                 });
@@ -187,7 +187,7 @@ public class CommandSlotDashboard : MonoBehaviour
                 mainThreadQueue.Enqueue(() =>
                 {
                     activeSlot = -1;
-                    if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = true; }
+                    if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = false; }
                     UpdateSlotUI(slot);
                     onComplete?.Invoke();
                 });

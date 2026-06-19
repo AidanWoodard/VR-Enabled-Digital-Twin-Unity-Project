@@ -30,6 +30,9 @@ Publishing is gated by two static flags that must both be clear:
 - `RobotBarrier.isCollisionActive` — set by collision detection
 - `ROSPublishToggle.IsPublishingEnabled` — toggled by dual-trigger hold gesture
 
+### Barrier Visual Suppression (added 2026-06-18)
+`RobotBarrier.cs` no longer shows the red barrier-violation `MeshRenderer` while `CommandSlotDashboard.IsRecording` is true or while `ROSPublishToggle.IsPublishingEnabled` is false (active control paused via dual-trigger hold). This is visual-only — `isCollisionActive` and the ROS publish-gating logic are unaffected, so the arm is still blocked from publishing on a real violation even when the visual is suppressed. `CommandSlotDashboard.IsRecording` is a new public static bool set `true` in `StartRecording`'s success callback and `false` unconditionally in `StopActiveSlot`'s Recording-branch callback (mirrors the existing `activeSlot = -1` always-clear pattern from the stuck-button fix below).
+
 ### Calibration Flow
 `pubtest.cs` waits 10 seconds after `Start` before capturing the controller's home position/rotation as the reference frame. `pubtest.isCalibrated` (static bool) gates pose publishing. The delta between current and home pose is added to a hardcoded ROS EE home position (`rosEEHomeInBaseLink`).
 
@@ -66,10 +69,10 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 | `pubtest.cs` | `Assets/Scripts/` | Main controller pose + gripper publisher |
 | `ROSPublishToggle.cs` | `Assets/Scripts/` | Static `IsPublishingEnabled` flag; hold both triggers 1 s to toggle |
 | `XRInputDebugger.cs` | `Assets/Scripts/` | Debug logger for all XR inputs; has `enableDebugger` Inspector checkbox |
-| `RobotBarrier.cs` | `Assets/Scripts/` | Collision detection; sets `isCollisionActive` |
+| `RobotBarrier.cs` | `Assets/Scripts/` | Collision detection; sets `isCollisionActive`; visual flash suppressed during recording/paused control |
 | `JointStateSubscriber.cs` | `Assets/Scripts/` | Subscribes to joint states from ROS |
 | `RobotDashboard.cs` | `Assets/Scripts/` | Legacy placeholder — superseded by `CommandSlotDashboard.cs` |
-| `CommandSlotDashboard.cs` | `Assets/Scripts/` | 5-slot record/play/clear dashboard; self-discovers rows, manages slot state machine, ROS service calls, radial hold-to-clear mechanic |
+| `CommandSlotDashboard.cs` | `Assets/Scripts/` | 5-slot record/play/clear dashboard; self-discovers rows, manages slot state machine, ROS service calls, radial hold-to-clear mechanic; exposes static `IsRecording` flag |
 | `SlotRowBinding.cs` | `Assets/Scripts/` | Per-row reference holder (`slotIndex`, `statusDot`, `recordButton`, `playButton`, `actionLabel`, `clearFillOverlay`); tagged `command_ui` on the prefab |
 | `VRPosePublisher.cs` / `VRPosePublisher2.cs` | `Assets/Scripts/` | Additional pose publishers (alternate or legacy) |
 
@@ -81,8 +84,8 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 ### Slot State Machine
 `CommandSlotDashboard.cs` tracks 5 independent slots. Each slot cycles: `Empty → HasRecording → Recording / Playing → HasRecording`.
 - Only one slot can be Recording or Playing at a time (`activeSlot` index).
-- **Record**: keeps live publishing enabled (user puppets arm; ROS records the pose stream).
-- **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; re-enables on stop.
+- **Record**: keeps live publishing enabled while active (user puppets arm; ROS records the pose stream). On a successful Stop, `StopActiveSlot()` now sets `ROSPublishToggle.IsPublishingEnabled = false` (live teleop no longer resumes automatically after Stop).
+- **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; stays `false` after a successful Stop (no longer re-enables) — re-enable via the dual-trigger hold gesture.
 - **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty.
 
 ### Morphing Record/Stop/Clear Button
