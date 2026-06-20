@@ -84,8 +84,8 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 ### Slot State Machine
 `CommandSlotDashboard.cs` tracks 5 independent slots. Each slot cycles: `Empty → HasRecording → Recording / Playing → HasRecording`.
 - Only one slot can be Recording or Playing at a time (`activeSlot` index).
-- **Record**: keeps live publishing enabled while active (user puppets arm; ROS records the pose stream). On a successful Stop, `StopActiveSlot()` leaves `ROSPublishToggle.IsPublishingEnabled` untouched (live teleop continues uninterrupted after Stop — no forced disable, unlike Play).
-- **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; stays `false` after a successful Stop (no longer re-enables) — re-enable via the dual-trigger hold gesture.
+- **Record**: `StartRecording()` now sets `ROSPublishToggle.IsPublishingEnabled = true` immediately on press (2026-06-20) — no longer requires the dual-trigger hold gesture first. On a successful Stop, `StopActiveSlot()` leaves `ROSPublishToggle.IsPublishingEnabled` untouched (live teleop continues uninterrupted after Stop — no forced disable, unlike Play).
+- **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; stays `false` after a successful Stop (no longer re-enables) — re-enable via the dual-trigger hold gesture. **Auto-resets without a Stop press** when the bag finishes on its own — see "Playback Auto-Finish Detection" below.
 - **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty. `ClearHoldRoutine()` never references `ROSPublishToggle` and never has — confirmed by code search and live Unity Editor inspection (2026-06-20): `RecordButton`/`PlayButton`'s `Button.onClick` lists are empty in the scene, the only listeners are the runtime-added `EventTrigger` callbacks in `WireMorphButton()`. If a publisher toggle is ever observed coinciding with a Clear-hold, it's the independent dual-trigger gesture in `ROSPublishToggle.cs` firing on its own 1 s timer, not Clear itself — both gestures happen to share the same hold duration.
 
 **Change (2026-06-20):** Previously, a successful Stop after Record *also* forced `ROSPublishToggle.IsPublishingEnabled = false` (same as after Play). This was changed so Record-stop no longer touches the flag at all — only Play-stop disables publishing. Rationale: pausing a Record shouldn't interrupt live teleop the way finishing a Playback should.
@@ -105,6 +105,8 @@ There is no separate `stopClearButton` GameObject anymore. `recordButton` itself
 | `dashboard/query_slots` | `DashboardQuerySlots.srv` | Returns `bool[5]` — whether each slot's bag file has data |
 | `dashboard/clear` | `DashboardClear.srv` | Truncates `slot_N.bag` to 0 bytes |
 
+Plus one topic (not a service): `dashboard/playback_finished` (`std_msgs/Int32`, payload = 1-based `slot_id`) — pushed by ROS the instant a `rosbag play` subprocess exits on its own. See "Playback Auto-Finish Detection" below.
+
 ROS node: `unity_vr_control/scripts/dashboard_controller.py`. Bags stored in `~/dashboard_bags/slot_N.bag`.
 
 C# message classes live in `Assets/RosMessages/Dashboard/srv/` under namespace `RosMessageTypes.Dashboard`.
@@ -114,6 +116,11 @@ C# message classes live in `Assets/RosMessages/Dashboard/srv/` under namespace `
 - `StatusDot` Image (color = state)
 - `RecordButton` — the morphing Record/Stop/Clear button, with children `Label` (text) and `ClearFillOverlay` Image (`fillMethod=Radial360`, orange tint, inactive by default)
 - `PlayButton` — separate, untouched by the morph mechanic
+
+### Playback Auto-Finish Detection (added 2026-06-20)
+The 2026-06-18 fix (below) only made the *manual* Stop path idempotent — the user still had to press Stop after a bag finished naturally. This was a separate gap: the whole dashboard link was pure request/response, so ROS had no way to proactively tell Unity a bag ended. Fix: ROS now pushes a topic, `dashboard/playback_finished` (`std_msgs/Int32`, payload = 1-based `slot_id`), the moment a `rosbag play` subprocess exits on its own (background thread calls `proc.wait()` after `Popen`, then publishes). Implemented on the live Linux node by a separate agent session — verify it's still present if `dashboard_controller.py` is ever rewritten.
+
+Unity side, `CommandSlotDashboard.cs`: subscribes once in `Start()` via `ros.Subscribe<Int32Msg>("dashboard/playback_finished", OnPlaybackFinishedFromROS)` (`Int32Msg` ships built-in in the ROS-TCP-Connector package under `RosMessageTypes.Std` — no message generation needed). `OnPlaybackFinishedFromROS` converts the 1-based ROS slot id to Unity's 0-based index, marshals onto `mainThreadQueue`, and only resets (`activeSlot = -1`, `states[slot] = HasRecording`, `UpdateSlotUI(slot)`) if `activeSlot == slot && states[slot] == Playing` — guards against a race with a near-simultaneous manual Stop press (whichever runs first wins; the second is a no-op).
 
 ## Coordinate System
 ROS uses FLU (Forward-Left-Up). Unity uses RUF (Right-Up-Forward). All pose conversions go through `.To<FLU>()` extension methods from `Unity.Robotics.ROSTCPConnector.ROSGeometry`. Quaternions must be manually reconstructed after conversion — the `.To<FLU>()` return type is not a `UnityEngine.Quaternion`.

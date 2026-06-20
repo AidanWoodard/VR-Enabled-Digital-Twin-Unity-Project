@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Dashboard;
+using RosMessageTypes.Std;
 
 public class CommandSlotDashboard : MonoBehaviour
 {
@@ -25,6 +26,7 @@ public class CommandSlotDashboard : MonoBehaviour
     const string SVC_PLAYBACK = "dashboard/playback";
     const string SVC_QUERY    = "dashboard/query_slots";
     const string SVC_CLEAR    = "dashboard/clear";
+    const string TOPIC_PLAYBACK_FINISHED = "dashboard/playback_finished";
 
     readonly ConcurrentQueue<Action> mainThreadQueue = new ConcurrentQueue<Action>();
     Coroutine clearCoroutine;
@@ -51,6 +53,7 @@ public class CommandSlotDashboard : MonoBehaviour
         ros.RegisterRosService<DashboardPlaybackRequest,   DashboardPlaybackResponse>(SVC_PLAYBACK);
         ros.RegisterRosService<DashboardQuerySlotsRequest, DashboardQuerySlotsResponse>(SVC_QUERY);
         ros.RegisterRosService<DashboardClearRequest,      DashboardClearResponse>(SVC_CLEAR);
+        ros.Subscribe<Int32Msg>(TOPIC_PLAYBACK_FINISHED, OnPlaybackFinishedFromROS);
 
         for (int i = 0; i < slots.Length; i++)
         {
@@ -99,6 +102,7 @@ public class CommandSlotDashboard : MonoBehaviour
         }
 
         activeSlot = slot;
+        ROSPublishToggle.IsPublishingEnabled = true;
         var req = new DashboardRecordRequest(slot + 1, true);
         ROSConnection.GetOrCreateInstance().SendServiceMessage<DashboardRecordResponse>(SVC_RECORD, req, resp =>
         {
@@ -154,6 +158,22 @@ public class CommandSlotDashboard : MonoBehaviour
                     ROSPublishToggle.IsPublishingEnabled = true;
                 }
             });
+        });
+    }
+
+    // Fired by ROS the moment a rosbag finishes playing on its own (no Stop press).
+    // msg.data is the 1-based slot_id (same indexing as DashboardPlayback.srv).
+    void OnPlaybackFinishedFromROS(Int32Msg msg)
+    {
+        int slot = msg.data - 1;
+        mainThreadQueue.Enqueue(() =>
+        {
+            if (activeSlot == slot && states[slot] == SlotState.Playing)
+            {
+                activeSlot = -1;
+                states[slot] = SlotState.HasRecording;
+                UpdateSlotUI(slot);
+            }
         });
     }
 
