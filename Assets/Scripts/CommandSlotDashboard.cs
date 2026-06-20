@@ -15,6 +15,13 @@ public class CommandSlotDashboard : MonoBehaviour
     SlotState[] states = new SlotState[5];
     int activeSlot = -1;
 
+    // True while a Start/Stop request is in flight. Without this, pressing two
+    // morph buttons before the first ROS response arrives lets the second press
+    // see stale (not-yet-updated) states[]/activeSlot and corrupt them — e.g. a
+    // slot's StartRecording response can land after the user has already moved
+    // on to a different slot, leaving that slot's state permanently stuck.
+    bool busy = false;
+
     public static bool IsRecording = false;
 
     static readonly Color ColorEmpty        = new Color(0.45f, 0.45f, 0.45f);
@@ -119,6 +126,7 @@ public class CommandSlotDashboard : MonoBehaviour
                     Debug.LogWarning($"[Dashboard] Record start failed for slot {slot + 1}: {resp.message}");
                     activeSlot = -1;
                 }
+                busy = false;
             });
         });
     }
@@ -127,8 +135,10 @@ public class CommandSlotDashboard : MonoBehaviour
 
     void OnPlayClicked(int slot)
     {
+        if (busy) return;
         if (states[slot] != SlotState.HasRecording) return;
 
+        busy = true;
         if (activeSlot >= 0 && activeSlot != slot)
         {
             StopActiveSlot(() => StartPlayback(slot));
@@ -157,6 +167,7 @@ public class CommandSlotDashboard : MonoBehaviour
                     activeSlot = -1;
                     ROSPublishToggle.IsPublishingEnabled = true;
                 }
+                busy = false;
             });
         });
     }
@@ -182,7 +193,7 @@ public class CommandSlotDashboard : MonoBehaviour
     void StopActiveSlot(Action onComplete = null)
     {
         int slot = activeSlot;
-        if (slot < 0) { onComplete?.Invoke(); return; }
+        if (slot < 0) { if (onComplete == null) busy = false; onComplete?.Invoke(); return; }
 
         if (states[slot] == SlotState.Recording)
         {
@@ -195,6 +206,7 @@ public class CommandSlotDashboard : MonoBehaviour
                     IsRecording = false;
                     if (resp.success) { states[slot] = SlotState.HasRecording; }
                     UpdateSlotUI(slot);
+                    if (onComplete == null) busy = false;
                     onComplete?.Invoke();
                 });
             });
@@ -209,6 +221,7 @@ public class CommandSlotDashboard : MonoBehaviour
                     activeSlot = -1;
                     if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = false; }
                     UpdateSlotUI(slot);
+                    if (onComplete == null) busy = false;
                     onComplete?.Invoke();
                 });
             });
@@ -216,6 +229,7 @@ public class CommandSlotDashboard : MonoBehaviour
         else
         {
             activeSlot = -1;
+            if (onComplete == null) busy = false;
             onComplete?.Invoke();
         }
     }
@@ -238,15 +252,17 @@ public class CommandSlotDashboard : MonoBehaviour
 
     void OnMorphButtonDown(int slot)
     {
+        if (busy) return;
         Debug.Log("Morphing button pressed!");
         switch (states[slot])
         {
             case SlotState.Empty:
+                busy = true;
                 StartRecording(slot);
                 break;
             case SlotState.Recording:
             case SlotState.Playing:
-                if (slot == activeSlot) StopActiveSlot();
+                if (slot == activeSlot) { busy = true; StopActiveSlot(); }
                 break;
             case SlotState.HasRecording:
                 // Begin hold-to-clear
