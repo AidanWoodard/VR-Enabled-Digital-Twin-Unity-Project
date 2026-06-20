@@ -173,7 +173,7 @@ public class CommandSlotDashboard : MonoBehaviour
                 {
                     activeSlot = -1;
                     IsRecording = false;
-                    if (resp.success) { states[slot] = SlotState.HasRecording; ROSPublishToggle.IsPublishingEnabled = false; }
+                    if (resp.success) { states[slot] = SlotState.HasRecording; }
                     UpdateSlotUI(slot);
                     onComplete?.Invoke();
                 });
@@ -307,11 +307,11 @@ public class CommandSlotDashboard : MonoBehaviour
 
         row.actionLabel.text = state switch
         {
-            SlotState.Empty        => "RECORD",
+            SlotState.Empty        => "REC",
             SlotState.HasRecording => "CLEAR",
             SlotState.Recording    => "STOP",
             SlotState.Playing      => "STOP",
-            _                      => "RECORD"
+            _                      => "REC"
         };
         row.recordButton.interactable = !otherActive;
 

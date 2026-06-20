@@ -84,13 +84,15 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 ### Slot State Machine
 `CommandSlotDashboard.cs` tracks 5 independent slots. Each slot cycles: `Empty → HasRecording → Recording / Playing → HasRecording`.
 - Only one slot can be Recording or Playing at a time (`activeSlot` index).
-- **Record**: keeps live publishing enabled while active (user puppets arm; ROS records the pose stream). On a successful Stop, `StopActiveSlot()` now sets `ROSPublishToggle.IsPublishingEnabled = false` (live teleop no longer resumes automatically after Stop).
+- **Record**: keeps live publishing enabled while active (user puppets arm; ROS records the pose stream). On a successful Stop, `StopActiveSlot()` leaves `ROSPublishToggle.IsPublishingEnabled` untouched (live teleop continues uninterrupted after Stop — no forced disable, unlike Play).
 - **Play**: sets `ROSPublishToggle.IsPublishingEnabled = false` so the bag drives the arm; stays `false` after a successful Stop (no longer re-enables) — re-enable via the dual-trigger hold gesture.
-- **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty.
+- **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty. `ClearHoldRoutine()` never references `ROSPublishToggle` and never has — confirmed by code search and live Unity Editor inspection (2026-06-20): `RecordButton`/`PlayButton`'s `Button.onClick` lists are empty in the scene, the only listeners are the runtime-added `EventTrigger` callbacks in `WireMorphButton()`. If a publisher toggle is ever observed coinciding with a Clear-hold, it's the independent dual-trigger gesture in `ROSPublishToggle.cs` firing on its own 1 s timer, not Clear itself — both gestures happen to share the same hold duration.
+
+**Change (2026-06-20):** Previously, a successful Stop after Record *also* forced `ROSPublishToggle.IsPublishingEnabled = false` (same as after Play). This was changed so Record-stop no longer touches the flag at all — only Play-stop disables publishing. Rationale: pausing a Record shouldn't interrupt live teleop the way finishing a Playback should.
 
 ### Morphing Record/Stop/Clear Button
 There is no separate `stopClearButton` GameObject anymore. `recordButton` itself morphs in place via `EventTrigger` PointerDown/Up (not `Button.onClick`, to avoid double-firing with the hold-to-clear gesture):
-- `Empty` → label `RECORD`, instant action on press: start recording.
+- `Empty` → label `REC`, instant action on press: start recording.
 - `Recording` / `Playing` → label `STOP` (dot color distinguishes which), instant action: stop the active slot.
 - `HasRecording` → label `CLEAR`, requires the 1 s hold (radial `clearFillOverlay`, now parented under `recordButton` instead of a dedicated button).
 `playButton` is untouched by this — it stays a separate button, interactable only when `HasRecording`.
