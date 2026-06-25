@@ -10,8 +10,8 @@ public class RobotDriveManager : EditorWindow
     }
 
     private GameObject robotRoot;
-    private float bulkStiffness = 10000f;
-    private float bulkDamping = 100f;
+    private float bulkStiffness = 3000f;
+    private float bulkDamping = 500f;
     private float bulkForceLimit = 1000f;
 
     private bool applyStiffness = true;

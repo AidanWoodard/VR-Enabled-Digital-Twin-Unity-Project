@@ -20,6 +20,17 @@ public class JointStateSubscriber : MonoBehaviour
     private float calibratedTime = 0f;
     private bool isReadyToMap = false;
 
+    [Header("Drive Settings")]
+    [SerializeField] private float driveStiffness = 3000f;
+    [SerializeField] private float driveDamping = 500f;
+    [SerializeField] private float driveForceLimit = 1000f;
+
+    [Header("No-Data Timeout")]
+    [SerializeField] private float noDataTimeout = 0.5f;
+    private float lastMessageTime = 0f;
+    private bool isDrivesFrozen = false;
+    private const float frozenDamping = 50f;
+
     // ROS to Unity joint name mapping
     private string[] rosJointNames = new string[] {
         "joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint_gripper_right", "joint_gripper_left"
@@ -59,18 +70,18 @@ public class JointStateSubscriber : MonoBehaviour
             }
         }
 
-        // Prismatic joints (grippers) are imported without stiffness/damping, so set them here.
-        // Without stiffness > 0, xDrive.target has no physical effect.
+        // Enforce stable PD gains on all joints at runtime.
+        // Prismatic (gripper) joints are imported with stiffness=0 by the URDF importer;
+        // revolute joints may have stale scene-file values. Setting all drives here guarantees
+        // consistent, numerically stable parameters regardless of what the scene file contains.
         foreach (var kvp in jointMap)
         {
             ArticulationBody ab = kvp.Value;
-            if (ab.jointType == ArticulationJointType.PrismaticJoint)
-            {
-                var drive = ab.xDrive;
-                drive.stiffness = 10000f;
-                drive.damping = 100f;
-                ab.xDrive = drive;
-            }
+            var drive = ab.xDrive;
+            drive.stiffness = driveStiffness;
+            drive.damping = driveDamping;
+            drive.forceLimit = driveForceLimit;
+            ab.xDrive = drive;
         }
     }
 
@@ -80,6 +91,8 @@ public class JointStateSubscriber : MonoBehaviour
         {
             wasCalibrated = false;
             isReadyToMap = false;
+            isDrivesFrozen = false;
+            lastMessageTime = 0f;
         }
         else
         {
@@ -100,12 +113,32 @@ public class JointStateSubscriber : MonoBehaviour
             {
                 isReadyToMap = true;
             }
+
+            // No-data deadman: if ready but no message has arrived within the timeout,
+            // zero revolute stiffness so the arm holds position via damping only.
+            // Gravity is disabled on all links, so zero stiffness is safe (no sag).
+            if (isReadyToMap && (Time.time - lastMessageTime > noDataTimeout))
+            {
+                if (!isDrivesFrozen)
+                {
+                    FreezeRevoluteDrives();
+                    isDrivesFrozen = true;
+                }
+            }
         }
     }
 
     void JointStateCallback(JointStateMsg msg)
     {
         if (!isReadyToMap) return;
+
+        lastMessageTime = Time.time;
+
+        if (isDrivesFrozen)
+        {
+            RestoreRevoluteDrives();
+            isDrivesFrozen = false;
+        }
 
         Debug.Log($"[ROS to Unity] Received JointState with {msg.name.Length} joints");
 
@@ -133,6 +166,39 @@ public class JointStateSubscriber : MonoBehaviour
             drive.target = jointPosition;
             joint.xDrive = drive;
         }
+    }
+
+    private void FreezeRevoluteDrives()
+    {
+        foreach (var kvp in jointMap)
+        {
+            ArticulationBody ab = kvp.Value;
+            if (ab.jointType == ArticulationJointType.RevoluteJoint)
+            {
+                var drive = ab.xDrive;
+                drive.stiffness = 0f;
+                drive.damping = frozenDamping;
+                ab.xDrive = drive;
+            }
+        }
+        Debug.LogWarning("[JointStateSubscriber] No data for " + noDataTimeout + "s — revolute drives frozen (stiffness=0, damping=" + frozenDamping + ").");
+    }
+
+    private void RestoreRevoluteDrives()
+    {
+        foreach (var kvp in jointMap)
+        {
+            ArticulationBody ab = kvp.Value;
+            if (ab.jointType == ArticulationJointType.RevoluteJoint)
+            {
+                var drive = ab.xDrive;
+                drive.stiffness = driveStiffness;
+                drive.damping = driveDamping;
+                drive.forceLimit = driveForceLimit;
+                ab.xDrive = drive;
+            }
+        }
+        Debug.Log("[JointStateSubscriber] Data received — revolute drives restored (stiffness=" + driveStiffness + ", damping=" + driveDamping + ").");
     }
 
 }
