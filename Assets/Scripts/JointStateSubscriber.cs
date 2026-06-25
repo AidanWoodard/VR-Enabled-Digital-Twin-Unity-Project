@@ -58,6 +58,20 @@ public class JointStateSubscriber : MonoBehaviour
                 Debug.LogWarning($"GameObject not found: {unityName}");
             }
         }
+
+        // Prismatic joints (grippers) are imported without stiffness/damping, so set them here.
+        // Without stiffness > 0, xDrive.target has no physical effect.
+        foreach (var kvp in jointMap)
+        {
+            ArticulationBody ab = kvp.Value;
+            if (ab.jointType == ArticulationJointType.PrismaticJoint)
+            {
+                var drive = ab.xDrive;
+                drive.stiffness = 10000f;
+                drive.damping = 100f;
+                ab.xDrive = drive;
+            }
+        }
     }
 
     void Update()
@@ -98,22 +112,26 @@ public class JointStateSubscriber : MonoBehaviour
         for (int i = 0; i < msg.name.Length; i++)
         {
             string jointName = msg.name[i];
-            float jointPosition = (float)msg.position[i] * Mathf.Rad2Deg;
 
-            //Debug.Log($"Joint: {jointName}  Target Angle: {jointPosition}"); //annoying debug statement
-
-            if (jointMap.ContainsKey(jointName))
-            {
-                ArticulationBody joint = jointMap[jointName];
-                var drive = joint.xDrive;
-                //Debug.Log($"Updating {jointName} (Unity: {joint.gameObject.name}) | Current: {drive.target} to New: {jointPosition}");
-                drive.target = jointPosition;
-                joint.xDrive = drive;
-            }
-            else
+            if (!jointMap.ContainsKey(jointName))
             {
                 Debug.LogWarning($"Joint name not mapped: {jointName}");
+                continue;
             }
+
+            ArticulationBody joint = jointMap[jointName];
+
+            // Prismatic joints (grippers) publish positions in meters; revolute joints in radians.
+            // Unity xDrive.target expects meters for prismatic and degrees for revolute.
+            float jointPosition = joint.jointType == ArticulationJointType.PrismaticJoint
+                ? (float)msg.position[i]
+                : (float)msg.position[i] * Mathf.Rad2Deg;
+
+            //Debug.Log($"Updating {jointName} | Target: {jointPosition}");
+
+            var drive = joint.xDrive;
+            drive.target = jointPosition;
+            joint.xDrive = drive;
         }
     }
 
