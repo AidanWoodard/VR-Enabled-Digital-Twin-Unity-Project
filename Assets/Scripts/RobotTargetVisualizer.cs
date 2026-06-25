@@ -30,6 +30,10 @@ public class RobotTargetVisualizer : MonoBehaviour
     private Quaternion initialDetectorRotation;
     private bool isTracking = false;
 
+    // World-space snapshot of the detector's position at scene start
+    private Vector3 startDetectorWorldPosition;
+    private Quaternion startDetectorWorldRotation;
+
     // Trigger point transforms (children of robotBarrierDetector)
     private Transform triggerPt1;
     private Transform triggerPt2;
@@ -49,6 +53,9 @@ public class RobotTargetVisualizer : MonoBehaviour
             Debug.LogWarning("[RobotTargetVisualizer] Please assign both linkGraspingFrame and robotBarrierDetector before saving.");
         }
     }
+
+    void OnEnable()  { pubtest.OnResetOrigin += HandleResetOrigin; }
+    void OnDisable() { pubtest.OnResetOrigin -= HandleResetOrigin; }
 
     void Start()
     {
@@ -76,6 +83,10 @@ public class RobotTargetVisualizer : MonoBehaviour
         // Snap the detector to its saved relative position at startup
         robotBarrierDetector.position = linkGraspingFrame.TransformPoint(localPositionOffset);
         robotBarrierDetector.rotation = linkGraspingFrame.rotation * localRotationOffset;
+
+        // Cache world-space start position for use by the reset feature
+        startDetectorWorldPosition = robotBarrierDetector.position;
+        startDetectorWorldRotation = robotBarrierDetector.rotation;
 
         Debug.Log("[RobotTargetVisualizer] Waiting for pubtest calibration before locking controller origin...");
     }
@@ -122,5 +133,18 @@ public class RobotTargetVisualizer : MonoBehaviour
         // robot_barrier_inverted tags, updates RobotBarrier.isCollisionActive, and returns
         // whether any violation is currently active.
         robotBarrier.CheckPoints(triggerPoints);
+    }
+
+    void HandleResetOrigin()
+    {
+        robotBarrierDetector.position = startDetectorWorldPosition;
+        robotBarrierDetector.rotation = startDetectorWorldRotation;
+
+        initialControllerPosition = rightController.position;
+        initialDetectorPosition   = robotBarrierDetector.position;
+        initialControllerRotation = rightController.rotation;
+        initialDetectorRotation   = robotBarrierDetector.rotation;
+
+        Debug.Log("[RobotTargetVisualizer] Origin reset. Detector snapped to scene-start position.");
     }
 }

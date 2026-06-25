@@ -27,8 +27,16 @@ public class pubtest : MonoBehaviour
     public static bool isCalibrated = false;
 
     Vector3 controllerHomeFlu;
-    Quaternion controllerHomeRotation; //  NEW
-    static readonly Vector3 rosEEHomeInBaseLink = new Vector3(0.308f, 0.00045f, 0.304f);
+    Quaternion controllerHomeRotation;
+
+    [Header("Home Position (ROS base_link frame)")]
+    [SerializeField] private Vector3 rosEEHomeInBaseLink = new Vector3(0.308f, 0.00045f, 0.304f);
+
+    [Header("Reset Controls")]
+    [SerializeField] private InputActionReference leftBButtonAction;
+    [SerializeField] private float resetHoldDuration = 1f;
+    private float resetHoldTimer = 0f;
+    public static event System.Action OnResetOrigin;
 
     //gripper control (A = close, B = open, right controller only)
     bool gripperOpenFull = false;
@@ -76,6 +84,7 @@ public class pubtest : MonoBehaviour
         }
         //gripper trigger
         CheckGripperTrigger();
+        CheckResetInput();
         //CheckSaveButton();        // omit, just use live hand tracking
         if (!isCalibrated) return;
 
@@ -137,7 +146,54 @@ public class pubtest : MonoBehaviour
         }
     }
 
-    //gripper test
+    void CheckResetInput()
+    {
+        if (!isCalibrated) return;
+        if (leftBButtonAction == null) return;
+
+        bool leftB = leftBButtonAction.action.IsPressed();
+        bool rightB = bButtonAction.action.IsPressed();
+
+        if (leftB && rightB)
+        {
+            resetHoldTimer += Time.deltaTime;
+            if (resetHoldTimer >= resetHoldDuration)
+            {
+                ResetControllerOrigin();
+                resetHoldTimer = 0f;
+            }
+        }
+        else
+        {
+            resetHoldTimer = 0f;
+        }
+    }
+
+    void ResetControllerOrigin()
+    {
+        Vector3 uHome = rightController.position;
+        var homeF = uHome.To<FLU>();
+        controllerHomeFlu = new Vector3(homeF.x, homeF.y, homeF.z);
+        var homeQuat = rightController.rotation.To<FLU>();
+        controllerHomeRotation = new Quaternion(homeQuat.x, homeQuat.y, homeQuat.z, homeQuat.w);
+
+        if (ROSPublishToggle.IsPublishingEnabled)
+        {
+            double now = Time.realtimeSinceStartup;
+            uint secs = (uint)System.Math.Floor(now);
+            uint nsecs = (uint)((now - secs) * 1e9);
+            var header = new HeaderMsg { stamp = new TimeMsg(secs, nsecs), frame_id = "sgr532/base_link" };
+            var pose = new PoseMsg(
+                new PointMsg(rosEEHomeInBaseLink.x, rosEEHomeInBaseLink.y, rosEEHomeInBaseLink.z),
+                new QuaternionMsg(0, 0, 0, 1)
+            );
+            ros.Publish(topicName, new PoseStampedMsg(header, pose));
+        }
+
+        OnResetOrigin?.Invoke();
+        Debug.Log("[pubtest] Controller origin reset.");
+    }
+
 void PublishGripperCommand(float value)
     {
         if (!ROSPublishToggle.IsPublishingEnabled) return;

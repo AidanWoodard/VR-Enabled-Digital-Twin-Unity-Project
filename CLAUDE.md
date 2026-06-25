@@ -36,6 +36,13 @@ Publishing is gated by two static flags that must both be clear:
 ### Calibration Flow
 `pubtest.cs` waits 10 seconds after `Start` before capturing the controller's home position/rotation as the reference frame. `pubtest.isCalibrated` (static bool) gates pose publishing. The delta between current and home pose is added to a hardcoded ROS EE home position (`rosEEHomeInBaseLink`).
 
+### Controller Origin Reset
+Hold **left B + right B simultaneously for `resetHoldDuration` seconds** (default 1 s, `[SerializeField]` on `pubtest`). On trigger:
+1. `pubtest.cs` re-locks `controllerHomeFlu`/`controllerHomeRotation` to the current hand, publishes `rosEEHomeInBaseLink` immediately (robot moves to home).
+2. `RobotTargetVisualizer.cs` snaps `robotBarrierDetector` back to the **world-space position captured at `Start()`** (`startDetectorWorldPosition/Rotation`), then re-locks `initialControllerPosition/Rotation` to the current hand.
+
+`rosEEHomeInBaseLink` is now `[SerializeField]` (editable in Inspector under "Home Position"). Wire `leftBButtonAction` in the Inspector to XRI Left Secondary Button.
+
 ### XR Input Setup
 - `XR Origin (XR Rig)` → `InputActionManager` holds `XRI Default Input Actions.inputactions` (enables the asset at runtime)
 - `EventSystem` → `XRUIInputModule` (`activeInputMode: 1` = XR Input) drives VR UI clicking
@@ -70,11 +77,12 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 | `ROSPublishToggle.cs` | `Assets/Scripts/` | Static `IsPublishingEnabled` flag; hold both triggers 1 s to toggle |
 | `XRInputDebugger.cs` | `Assets/Scripts/` | Debug logger for all XR inputs; has `enableDebugger` Inspector checkbox |
 | `RobotBarrier.cs` | `Assets/Scripts/` | Collision detection; sets `isCollisionActive`; visual flash suppressed during recording/paused control |
-| `JointStateSubscriber.cs` | `Assets/Scripts/` | Subscribes to joint states from ROS |
+| `JointStateSubscriber.cs` | `Assets/Scripts/` | Subscribes to `/sgr532/joint_states` and drives Unity ArticulationBody targets. **URDF importer caveat:** prismatic gripper joints (`joint_gripper_left/right`) are imported with `xDrive.stiffness=0` — `JointStateSubscriber.Start()` sets stiffness/damping at runtime so re-importing the URDF won't break tracking. Gripper positions from ROS are in **meters** (not radians); the callback skips `Rad2Deg` for `ArticulationJointType.PrismaticJoint`. **Drive stability:** All joints initialized at runtime to `stiffness=3000, damping=500` (Inspector-tunable). `stiffness=10000` caused numerical instability at 50Hz FixedUpdate. **No-data deadman:** 0.5s after `isReadyToMap` with no messages, revolute drives freeze to `stiffness=0, damping=50` (velocity-only braking; safe since gravity is disabled on all links). Drives restore automatically on the next received message. |
 | `RobotDashboard.cs` | `Assets/Scripts/` | Legacy placeholder — superseded by `CommandSlotDashboard.cs` |
 | `CommandSlotDashboard.cs` | `Assets/Scripts/` | 5-slot record/play/clear dashboard; self-discovers rows, manages slot state machine, ROS service calls, radial hold-to-clear mechanic; exposes static `IsRecording` flag |
 | `SlotRowBinding.cs` | `Assets/Scripts/` | Per-row reference holder (`slotIndex`, `statusDot`, `recordButton`, `playButton`, `actionLabel`, `clearFillOverlay`); tagged `command_ui` on the prefab |
 | `VRPosePublisher.cs` / `VRPosePublisher2.cs` | `Assets/Scripts/` | Additional pose publishers (alternate or legacy) |
+| `ControllerReferencePanel.cs` | `Assets/Scripts/` | Attach to Left Controller. Dots the controller's `palmLocalAxis` (default `Vector3.up`) against world-up each frame; shows `referencePanel` (child UI GameObject) when palm faces up within `activationAngle` (default 45°). No `InputAction` — pure transform check. Tune `palmLocalAxis` in Inspector if Valve Index orientation is off. |
 
 ## Dashboard Architecture
 
@@ -89,6 +97,11 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 - **Clear**: hold CLEAR button 1 s (radial fill overlay) → calls `DashboardClear` service → ROS zeroes the bag file → slot → Empty. `ClearHoldRoutine()` never references `ROSPublishToggle` and never has — confirmed by code search and live Unity Editor inspection (2026-06-20): `RecordButton`/`PlayButton`'s `Button.onClick` lists are empty in the scene, the only listeners are the runtime-added `EventTrigger` callbacks in `WireMorphButton()`. If a publisher toggle is ever observed coinciding with a Clear-hold, it's the independent dual-trigger gesture in `ROSPublishToggle.cs` firing on its own 1 s timer, not Clear itself — both gestures happen to share the same hold duration.
 
 **Change (2026-06-20):** Previously, a successful Stop after Record *also* forced `ROSPublishToggle.IsPublishingEnabled = false` (same as after Play). This was changed so Record-stop no longer touches the flag at all — only Play-stop disables publishing. Rationale: pausing a Record shouldn't interrupt live teleop the way finishing a Playback should.
+
+### Concurrency Guard — `busy` flag (added 2026-06-20)
+Bug: rapidly pressing two different slots' Record buttons (e.g. near-simultaneously) could permanently strand a slot. `StartRecording()` sets `activeSlot` synchronously but only sets `states[slot] = Recording` inside the async ROS response callback. A second press before that response arrives saw `activeSlot` already claimed but `states[]` not yet updated, fell through to `StopActiveSlot()`'s no-op `else` branch (no ROS stop call sent), and reassigned `activeSlot` to the new slot. The first slot's delayed success response then landed *after* `activeSlot` had moved on, setting `states[firstSlot] = Recording` with nothing pointing at it — stuck forever (`OnMorphButtonDown`'s `if (slot == activeSlot)` guard on Stop never matches again). Confirmed live via Unity MCP reflection: observed `states = [Recording, Empty, Empty, Empty, Empty]` with `activeSlot = -1`.
+
+Fix: added `bool busy` field. `OnMorphButtonDown`/`OnPlayClicked` ignore the press entirely (`if (busy) return;`) if a request is already in flight; `busy` is set `true` right before any Start/Stop call and cleared `false` only at the true end of a chain (`StartRecording`/`StartPlayback`'s response callback, or `StopActiveSlot`'s callback when `onComplete == null` — i.e. not mid-redirect to a different slot). This is a Unity-only fix; no ROS-side change needed since the race is purely about two near-simultaneous presses outrunning one network round-trip.
 
 ### Morphing Record/Stop/Clear Button
 There is no separate `stopClearButton` GameObject anymore. `recordButton` itself morphs in place via `EventTrigger` PointerDown/Up (not `Button.onClick`, to avoid double-firing with the hold-to-clear gesture):
