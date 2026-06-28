@@ -73,6 +73,7 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 
 | Script | Location | Purpose |
 |---|---|---|
+| `CameraSubscriber.cs` | `Assets/Scripts/` | Subscribes to `/usb_cam/image_raw` (`ImageMsg`) and blits raw bytes into a `Texture2D` displayed on the `LiveCameraFeed` `RawImage`. Resolution (`targetWidth`/`targetHeight`, default 640×480) and frame-rate cap (`targetFPS`, default 30 Hz; 0 = unlimited) are `[SerializeField]` — set in Inspector. **Width/height must match what the ROS camera publishes**, or `LoadRawTextureData` throws a size mismatch. |
 | `pubtest.cs` | `Assets/Scripts/` | Main controller pose + gripper publisher |
 | `ROSPublishToggle.cs` | `Assets/Scripts/` | Static `IsPublishingEnabled` flag; hold both triggers 1 s to toggle |
 | `XRInputDebugger.cs` | `Assets/Scripts/` | Debug logger for all XR inputs; has `enableDebugger` Inspector checkbox |
