@@ -798,7 +798,6 @@ MonoBehaviour:
   rosTopicName: /cam2/usb_cam/image/compressed
   targetWidth: 640
   targetHeight: 480
-  targetFPS: 30
 --- !u!114 &147129450
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1314,10 +1313,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1711598787}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 50}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 136.81036, y: -33}
+  m_SizeDelta: {x: 253.62073, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &225363374
 MonoBehaviour:
@@ -1838,7 +1837,6 @@ MonoBehaviour:
   rosTopicName: /cam1/usb_cam/image/compressed
   targetWidth: 640
   targetHeight: 480
-  targetFPS: 30
 --- !u!1 &267979731
 GameObject:
   m_ObjectHideFlags: 0
@@ -11779,6 +11777,7 @@ MonoBehaviour:
   linkGraspingFrame: {fileID: 2006035890}
   rightController: {fileID: 1136521207}
   robotBarrier: {fileID: 1941500021}
+  robotRoot: {fileID: 661789015}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localRotationOffset: {x: 0, y: 0, z: 0, w: 1}
 --- !u!1 &1795001490 stripped
@@ -13179,10 +13178,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1711598787}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 50}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 136.81036, y: -89}
+  m_SizeDelta: {x: 253.62073, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1963181986
 MonoBehaviour:

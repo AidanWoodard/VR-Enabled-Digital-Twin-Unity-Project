@@ -84,6 +84,7 @@ HMD tracking (Vive headset) does not require its own interaction profile; SteamV
 | `SlotRowBinding.cs` | `Assets/Scripts/` | Per-row reference holder (`slotIndex`, `statusDot`, `recordButton`, `playButton`, `actionLabel`, `clearFillOverlay`); tagged `command_ui` on the prefab |
 | `VRPosePublisher.cs` / `VRPosePublisher2.cs` | `Assets/Scripts/` | Additional pose publishers (alternate or legacy) |
 | `ControllerReferencePanel.cs` | `Assets/Scripts/` | Attach to Left Controller. Dots the controller's `palmLocalAxis` (default `Vector3.up`) against world-up each frame; shows `referencePanel` (child UI GameObject) when palm faces up within `activationAngle` (default 45°). No `InputAction` — pure transform check. Tune `palmLocalAxis` in Inspector if Valve Index orientation is off. |
+| `RobotTargetVisualizer.cs` | `Assets/Scripts/` | Drives `robotBarrierDetector` (the small EE-target origin mesh) to match what `pubtest.cs` is sending to the robot. `ScaleFactor` reads `robotRoot.lossyScale.x` — **must be `lossyScale`, not `localScale`** — because `robotRoot` is assigned to `sgr532/base_link` (localScale=1 always; lossyScale=1.548 = compound scale of `--Robot` × `Robot`). `robotBarrierDetector.localScale` is intentionally not set in code; edit its visual size in the Editor directly. |
 
 ## Dashboard Architecture
 
@@ -135,6 +136,26 @@ C# message classes live in `Assets/RosMessages/Dashboard/srv/` under namespace `
 The 2026-06-18 fix (below) only made the *manual* Stop path idempotent — the user still had to press Stop after a bag finished naturally. This was a separate gap: the whole dashboard link was pure request/response, so ROS had no way to proactively tell Unity a bag ended. Fix: ROS now pushes a topic, `dashboard/playback_finished` (`std_msgs/Int32`, payload = 1-based `slot_id`), the moment a `rosbag play` subprocess exits on its own (background thread calls `proc.wait()` after `Popen`, then publishes). Implemented on the live Linux node by a separate agent session — verify it's still present if `dashboard_controller.py` is ever rewritten.
 
 Unity side, `CommandSlotDashboard.cs`: subscribes once in `Start()` via `ros.Subscribe<Int32Msg>("dashboard/playback_finished", OnPlaybackFinishedFromROS)` (`Int32Msg` ships built-in in the ROS-TCP-Connector package under `RosMessageTypes.Std` — no message generation needed). `OnPlaybackFinishedFromROS` converts the 1-based ROS slot id to Unity's 0-based index, marshals onto `mainThreadQueue`, and only resets (`activeSlot = -1`, `states[slot] = HasRecording`, `UpdateSlotUI(slot)`) if `activeSlot == slot && states[slot] == Playing` — guards against a race with a near-simultaneous manual Stop press (whichever runs first wins; the second is a no-op).
+
+### Auto-Save Recording on Scene Exit (added 2026-06-29)
+
+**Problem:** Hitting the Editor Stop button mid-recording never called `StopActiveSlot()`, so `rosbag record` on the Linux machine received no `SIGINT`. The bag file existed (size > 0) but had no index — `rosbag play` would start, exit in ~1 second, and the robot would not move. Additionally, because `record_procs[slot]` on the continuously-running `dashboard_controller.py` still held the orphaned subprocess, the next attempt to record to that slot failed silently (no console error), leaving the slot appearing empty but unresponsive.
+
+**Fix — Unity side only (`CommandSlotDashboard.cs`):**
+
+1. `ROSConnection _ros` cached in `Start()` — avoids calling `GetOrCreateInstance()` during teardown, which can throw if the singleton is already being destroyed.
+2. `#if UNITY_EDITOR` block subscribes to `EditorApplication.playModeStateChanged` in `OnEnable` / unsubscribes in `OnDisable`. When `ExitingPlayMode` fires (before any `OnDestroy`/`OnDisable` on scene objects), `TrySendExitStop()` runs while ROSConnection is still fully alive and its TCP background thread can flush the packet.
+3. `OnDestroy()` calls `TrySendExitStop()` as a fallback for standalone builds (where `EditorApplication` is unavailable); in the Editor it is guarded by `_exitStopSent` to prevent double-sending.
+4. `TrySendExitStop()` checks `activeSlot >= 0 && states[activeSlot] == Recording`, clears `IsRecording`, and fires a fire-and-forget `DashboardRecordRequest(slot + 1, false)`. No minimum duration threshold — any recording is saved.
+
+**Why `ExitingPlayMode` beats `OnDestroy`:** `OnDestroy` fires mid-teardown; ROSConnection's own `OnDestroy` may close the TCP socket first, meaning the stop packet never leaves. `ExitingPlayMode` fires at the moment the Stop button is pressed, before teardown begins.
+
+**Verification:** After stopping the scene mid-recording, check:
+- Unity console: `[Dashboard] Scene exit: auto-stopping recording on slot N`
+- ROS terminal: `[Dashboard] Recording stopped for slot N`
+- `rosbag info ~/dashboard_bags/slot_N.bag` should show a real duration and message count
+
+**No ROS-side changes made.** A ROS-side startup cleanup in `dashboard_controller.py` (scanning `record_procs` for stale subprocesses on node init) would add belt-and-suspenders coverage for the edge case where the Unity TCP packet never arrives — deferred for now.
 
 ## Coordinate System
 ROS uses FLU (Forward-Left-Up). Unity uses RUF (Right-Up-Forward). All pose conversions go through `.To<FLU>()` extension methods from `Unity.Robotics.ROSTCPConnector.ROSGeometry`. Quaternions must be manually reconstructed after conversion — the `.To<FLU>()` return type is not a `UnityEngine.Quaternion`.
