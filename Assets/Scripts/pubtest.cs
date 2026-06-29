@@ -44,7 +44,8 @@ public class pubtest : MonoBehaviour
     float gripperVal = 0.0000f;
     private const float MIN_GRIPPER = -0.035f;              // Fully closed
     private const float MAX_GRIPPER = 0.0f;                 // Fully opened
-    [SerializeField] private const float GRIPPER_INCREMENT = 0.0085f;
+    [Header("Gripper Speed")]
+    [SerializeField] private float gripperSpeed = 0.0085f;
 
     //// save position feat. (not in use, legacy)
     //bool saveButtonPressed = false;
@@ -126,11 +127,11 @@ public class pubtest : MonoBehaviour
 
         if (aPressed && !gripperClosedFull)
         {
-            gripperVal -= GRIPPER_INCREMENT * Time.deltaTime;
+            gripperVal -= gripperSpeed * Time.deltaTime;
         }
         else if (bPressed && !gripperOpenFull)
         {
-            gripperVal += GRIPPER_INCREMENT * Time.deltaTime;
+            gripperVal += gripperSpeed * Time.deltaTime;
         }
 
         //Debug.Log("[DEBUG] Gripper position: " + gripperVal);

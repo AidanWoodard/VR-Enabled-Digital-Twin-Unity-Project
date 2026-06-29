@@ -22,6 +22,15 @@ public class CommandSlotDashboard : MonoBehaviour
     // on to a different slot, leaving that slot's state permanently stuck.
     bool busy = false;
 
+    // Cached on Start() so the exit-stop path can reach ROS without calling
+    // GetOrCreateInstance() during scene teardown (which may throw).
+    ROSConnection _ros;
+
+#if UNITY_EDITOR
+    // Prevents double-sending when both ExitingPlayMode and OnDestroy fire.
+    bool _exitStopSent;
+#endif
+
     public static bool IsRecording = false;
 
     static readonly Color ColorEmpty        = new Color(0.45f, 0.45f, 0.45f);
@@ -55,12 +64,12 @@ public class CommandSlotDashboard : MonoBehaviour
 
     void Start()
     {
-        var ros = ROSConnection.GetOrCreateInstance();
-        ros.RegisterRosService<DashboardRecordRequest,     DashboardRecordResponse>(SVC_RECORD);
-        ros.RegisterRosService<DashboardPlaybackRequest,   DashboardPlaybackResponse>(SVC_PLAYBACK);
-        ros.RegisterRosService<DashboardQuerySlotsRequest, DashboardQuerySlotsResponse>(SVC_QUERY);
-        ros.RegisterRosService<DashboardClearRequest,      DashboardClearResponse>(SVC_CLEAR);
-        ros.Subscribe<Int32Msg>(TOPIC_PLAYBACK_FINISHED, OnPlaybackFinishedFromROS);
+        _ros = ROSConnection.GetOrCreateInstance();
+        _ros.RegisterRosService<DashboardRecordRequest,     DashboardRecordResponse>(SVC_RECORD);
+        _ros.RegisterRosService<DashboardPlaybackRequest,   DashboardPlaybackResponse>(SVC_PLAYBACK);
+        _ros.RegisterRosService<DashboardQuerySlotsRequest, DashboardQuerySlotsResponse>(SVC_QUERY);
+        _ros.RegisterRosService<DashboardClearRequest,      DashboardClearResponse>(SVC_CLEAR);
+        _ros.Subscribe<Int32Msg>(TOPIC_PLAYBACK_FINISHED, OnPlaybackFinishedFromROS);
 
         for (int i = 0; i < slots.Length; i++)
         {
@@ -73,7 +82,7 @@ public class CommandSlotDashboard : MonoBehaviour
 
         for (int i = 0; i < slots.Length; i++) UpdateSlotUI(i);
 
-        ros.SendServiceMessage<DashboardQuerySlotsResponse>(
+        _ros.SendServiceMessage<DashboardQuerySlotsResponse>(
             SVC_QUERY,
             new DashboardQuerySlotsRequest(),
             OnQuerySlotsResponse
@@ -84,6 +93,50 @@ public class CommandSlotDashboard : MonoBehaviour
     {
         while (mainThreadQueue.TryDequeue(out var action))
             action?.Invoke();
+    }
+
+#if UNITY_EDITOR
+    // ExitingPlayMode fires before any OnDestroy/OnDisable, so ROSConnection is
+    // still fully alive and the TCP background thread can actually flush the packet.
+    void OnEnable()  => UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+    void OnDisable() => UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+
+    void OnPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+    {
+        if (state != UnityEditor.PlayModeStateChange.ExitingPlayMode) return;
+        _exitStopSent = true;
+        TrySendExitStop();
+    }
+#endif
+
+    // Fallback for standalone builds (OnApplicationQuit) where EditorApplication
+    // is unavailable. In the Editor this is a last-resort safety net only.
+    void OnDestroy()
+    {
+#if UNITY_EDITOR
+        if (_exitStopSent) return;
+#endif
+        TrySendExitStop();
+    }
+
+    void TrySendExitStop()
+    {
+        if (activeSlot < 0 || states[activeSlot] != SlotState.Recording) return;
+        if (_ros == null) return;
+        IsRecording = false;
+        try
+        {
+            _ros.SendServiceMessage<DashboardRecordResponse>(
+                SVC_RECORD,
+                new DashboardRecordRequest(activeSlot + 1, false),
+                _ => { }
+            );
+            Debug.Log($"[Dashboard] Scene exit: auto-stopping recording on slot {activeSlot + 1}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Dashboard] Scene exit: could not send stop — {e.Message}");
+        }
     }
 
     // ── Query ─────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ public class JointStateSubscriber : MonoBehaviour
     public bool useBufferCalibrationDelay = true;
 
     [SerializeField] private float calibrationWaitTime = 2.0f;
+    [SerializeField] private GameObject robotCalibratingUI;
     private bool wasCalibrated = false;
     private float calibratedTime = 0f;
     private bool isReadyToMap = false;
@@ -90,6 +91,8 @@ public class JointStateSubscriber : MonoBehaviour
         if (!pubtest.isCalibrated)
         {
             wasCalibrated = false;
+            if (isReadyToMap && robotCalibratingUI != null)
+                robotCalibratingUI.SetActive(true);
             isReadyToMap = false;
             isDrivesFrozen = false;
             lastMessageTime = 0f;
@@ -106,12 +109,22 @@ public class JointStateSubscriber : MonoBehaviour
             {
                 if (Time.time - calibratedTime >= calibrationWaitTime)
                 {
-                    isReadyToMap = true;
+                    if (!isReadyToMap)
+                    {
+                        isReadyToMap = true;
+                        if (robotCalibratingUI != null)
+                            robotCalibratingUI.SetActive(false);
+                    }
                 }
             }
             else
             {
-                isReadyToMap = true;
+                if (!isReadyToMap)
+                {
+                    isReadyToMap = true;
+                    if (robotCalibratingUI != null)
+                        robotCalibratingUI.SetActive(false);
+                }
             }
 
             // No-data deadman: if ready but no message has arrived within the timeout,

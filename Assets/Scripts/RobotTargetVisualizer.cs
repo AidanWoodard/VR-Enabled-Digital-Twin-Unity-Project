@@ -34,6 +34,8 @@ public class RobotTargetVisualizer : MonoBehaviour
     private Vector3 startDetectorWorldPosition;
     private Quaternion startDetectorWorldRotation;
 
+    private float ScaleFactor => transform.parent != null ? transform.parent.localScale.x : 1f;
+
     // Trigger point transforms (children of robotBarrierDetector)
     private Transform triggerPt1;
     private Transform triggerPt2;
@@ -83,6 +85,7 @@ public class RobotTargetVisualizer : MonoBehaviour
         // Snap the detector to its saved relative position at startup
         robotBarrierDetector.position = linkGraspingFrame.TransformPoint(localPositionOffset);
         robotBarrierDetector.rotation = linkGraspingFrame.rotation * localRotationOffset;
+        robotBarrierDetector.localScale = Vector3.one * ScaleFactor;
 
         // Cache world-space start position for use by the reset feature
         startDetectorWorldPosition = robotBarrierDetector.position;
@@ -109,7 +112,8 @@ public class RobotTargetVisualizer : MonoBehaviour
 
         // ── 2. Map controller position and rotation delta to the detector ──
         Vector3 controllerDelta = rightController.position - initialControllerPosition;
-        robotBarrierDetector.position = initialDetectorPosition + controllerDelta;
+        robotBarrierDetector.position = initialDetectorPosition + controllerDelta * ScaleFactor;
+        robotBarrierDetector.localScale = Vector3.one * ScaleFactor;
 
         Quaternion controllerRotDelta = rightController.rotation * Quaternion.Inverse(initialControllerRotation);
         robotBarrierDetector.rotation = controllerRotDelta * initialDetectorRotation;
