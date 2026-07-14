@@ -17,6 +17,12 @@ public class pubtest : MonoBehaviour
     [SerializeField] private InputActionReference bButtonAction;    // secondary button
 
     ROSConnection ros;
+
+    [Header("ROS Connection")]
+    [SerializeField] private bool useEthernet = false;
+    [SerializeField] private string localIP = "127.0.0.1";
+    [SerializeField] private string ethernetIP = "-";
+
     public string topicName = "/sgr532/vr_target_pose";
     public string teachtopicname = "/sgr532/teach_pose";
     public float publishRateHz = 20f;
@@ -52,9 +58,14 @@ public class pubtest : MonoBehaviour
     //bool saveButtonJustPressed = false;
     //InputDevice rightHand;
 
-    void Start()
+    void Awake()
     {
         ros = ROSConnection.GetOrCreateInstance();
+        ros.RosIPAddress = useEthernet ? ethernetIP : localIP;
+    }
+
+    void Start()
+    {
         ros.RegisterPublisher<PoseStampedMsg>(topicName);
         ros.RegisterPublisher<PoseStampedMsg>(teachtopicname);
         ros.RegisterPublisher<Float64Msg>("/sgr532/gripper/command");
