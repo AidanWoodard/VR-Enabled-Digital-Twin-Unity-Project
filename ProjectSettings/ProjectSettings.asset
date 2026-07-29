@@ -926,11 +926,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: f9adc498-e1e3-44f4-a54d-d8a97276830d
+  cloudProjectId: 3a5c1f84-68ad-4188-8047-3972bd02557e
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Sam's Robot Shop
-  organizationId: xrlabkent2
+  projectName: Testground
+  organizationId: xrlabdesk8
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
