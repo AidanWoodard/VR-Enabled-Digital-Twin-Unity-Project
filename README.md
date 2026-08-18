@@ -43,7 +43,7 @@ The robot dashboard, visible in the VR Unity scene as an interactive dashboard, 
 
 To prevent self-collision and collision with surfaces, the `Unity` scene uses bounding boxes set to `IsTrigger` to detect potential collision. `ROS` messages will pause until a collision prevention is confirmed. This prevents the operator from accidentally damaging the robot or injuring nearby operators.
 
-<img src="Images/boundries-clear.png" width="450"> <img src="Images/boundries-red.png" width="450">
+<img src="Images/boundries-clear.png" width="400"> <img src="Images/boundries-red.png" width="400">
 
 ### **Remote Capabilities**
 
@@ -53,7 +53,7 @@ By changing the target IP address in the `ROS` TCP endpoint to be a separate com
 
 Two live webcam feeds controlled by individual `ROS` nodes output a live feed that is listened for in the Unity VR scene. The camera startup sequence is automatically staggered to prevent crowding the bus when porting from Windows or MacOS into `WSL2`.
 
-<img src="Images/empty-workspace.png" width="450">  <img src="Images/workspace.png" width="450">
+<img src="Images/empty-workspace.png" width="400">  <img src="Images/workspace.png" width="400">
 
 > See **https://github.com/AidanWoodard/VR-Enabled-Digital-Twin** for all `ROS` nodes and robot setup.
 
